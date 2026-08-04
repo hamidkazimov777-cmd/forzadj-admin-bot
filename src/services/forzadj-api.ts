@@ -27,6 +27,7 @@ export async function publishTrack(pub: PendingPublication): Promise<PublishResu
     genre: pub.aiResult?.genre,
     mood: pub.aiResult?.mood,
     version: pub.aiResult?.version,
+    energy: pub.aiResult?.rating,
     fileName: pub.fileName,
     mimeType: pub.mimeType,
   };
