@@ -35,7 +35,7 @@ export function createAudioHandler(token: string) {
       return;
     }
 
-    const { block: metadataBlock, input: metadataInput } = await extractAudioMetadata(downloaded.savePath);
+    const { block: metadataBlock, input: metadataInput } = await extractAudioMetadata(downloaded.savePath, file.file_name);
 
     // Replace the internal "📋 Metadata" header with the new "📀 Metadata" section header.
     const METADATA_HEADER = "📋 Metadata\n\n";
