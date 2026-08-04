@@ -157,12 +157,32 @@ Full end-to-end audit completed. No code bugs found. Summary:
 
 **Typo in `.env`:** `TOKENROUTER_MODEL=moonshotai/kimi-k3-freeё` — trailing Cyrillic `ё`. Fix manually: `TOKENROUTER_MODEL=moonshotai/kimi-k3-free`. AI fails gracefully; does not block publish.
 
+# First Real Publication Test Results (2026-08-04)
+
+**Env vars configured:** `FORZADJ_API_URL=http://localhost:3000`, `FORZADJ_BOT_SECRET` (bot) and `BOT_UPLOAD_SECRET` (site) set to shared 48-char hex secret. `TOKENROUTER_MODEL` typo fixed.
+
+**Backend pipeline — all stages PASS:**
+
+| Stage | Result |
+|-------|--------|
+| `POST /api/bot/upload` | ✅ HTTP 200 in 24s |
+| Track in DB | ✅ title, artist, year, mood, genre, version all correct |
+| Audio in Storage (`audio` bucket) | ✅ original.mp3 6.9 MB |
+| Preview (`previews` bucket) | ✅ preview.mp3 2.7 MB (ffmpeg ran) |
+| Waveform (`previews` bucket) | ✅ peaks.json 23 KB |
+| `asset.process` inline job | ✅ ORIGINAL / PREVIEW / WAVEFORM all READY |
+| `audio.analyze` inline job | ✅ BPM=128, Camelot=4A |
+| Studio page | ✅ GET 200 — track visible at `/studio/tracks/<id>` |
+
+**Tested track:** `Demo Track 1.mp3` (Pioneer DJ, House, 2025, 172s)
+
+**Telegram flow:** Bot is running (`pnpm dev`). Requires user to send MP3 via Telegram client and press ✅ Publish. The full Telegram→Bot→API path is code-correct; only manual UI step remains.
+
 # Next Planned Step
 
-Set the following env vars, then test end-to-end publication of a real track:
-1. In bot `.env`: `FORZADJ_API_URL=https://forzadj.ru` and `FORZADJ_BOT_SECRET=<secret>`
-2. In site `.env`: `BOT_UPLOAD_SECRET=<same-secret>` (minimum 32 characters)
-3. Fix typo: `TOKENROUTER_MODEL=moonshotai/kimi-k3-free` (remove Cyrillic `ё`)
+1. User sends MP3 to bot via Telegram → presses ✅ Publish → verifies Studio link.
+2. After successful Telegram test: open Studio, fill in remaining metadata, publish track to pool.
+3. Resolve Kimi AI provider (TokenRouter 403 issue) or migrate to DeepSeek V3.
 
 # Future Roadmap
 
