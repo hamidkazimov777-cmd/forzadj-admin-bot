@@ -1,6 +1,7 @@
 import { Bot } from "grammy";
 import "dotenv/config";
 import { createAudioHandler } from "./handlers/audio";
+import { authMiddleware } from "./bot/auth";
 
 const token = process.env.BOT_TOKEN;
 
@@ -10,6 +11,8 @@ if (!token) {
 }
 
 const bot = new Bot(token);
+
+bot.use(authMiddleware);
 
 bot.command("start", (ctx) => ctx.reply("👋 ForzaDJ Admin Bot is running."));
 
