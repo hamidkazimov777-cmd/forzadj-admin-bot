@@ -63,6 +63,7 @@ All loaded from `.env` (never committed — `.env` is gitignored; `.env.example`
 - `TOKENROUTER_BASE_URL` — TokenRouter base URL (e.g. `https://api.tokenrouter.com/v1`).
 - `TOKENROUTER_MODEL` — TokenRouter model ID (e.g. `moonshotai/kimi-k3-free`).
 - `ALLOWED_TELEGRAM_IDS` — comma-separated whitelisted Telegram user IDs (e.g. `123456789,987654321`).
+- `GROQ_API_KEY` — Groq API key (console.groq.com); used when `AI_PROVIDER=groq`.
 - `FORZADJ_API_URL` — ForzaDJ website base URL (e.g. `https://forzadj.ru`).
 - `FORZADJ_BOT_SECRET` — shared secret matching `BOT_UPLOAD_SECRET` on the ForzaDJ site.
 
@@ -73,7 +74,8 @@ Never include real secret values anywhere in the repository.
 1. `analyzeTrack(input: AIInput)` in `src/services/ai/provider.ts` is the single entry point.
 2. It reads `AI_PROVIDER` via `getAIProvider()` (`src/config/ai.ts`); unsupported values throw a clear error.
 3. `mock` → returns fixed values `{ genre: "House", mood: "Primetime", version: "Extended", rating: 5 }` without any network call.
-4. `kimi` → `analyzeWithKimi()` (`src/services/ai/providers/kimi.ts`) sends an OpenAI-compatible `POST {TOKENROUTER_BASE_URL}/chat/completions` request. The prompt is built by `buildPrompt(input)`: it injects available `AIInput` fields as track context and instructs the model to classify using the ForzaDJ taxonomy only (genres: Afro House, Baile Funk, Bass House, Breaks, EDM, Garage, Hip-Hop, House, Jersey Club, Open Format, Pop, Rus, Tech House; moods: Warm Up, Prime Time, After Party; versions: Original, Extended, Remix, Mashup; rating: 1–5 integer). Falls back to "Open Format" if genre is uncertain. Returns JSON only. The JSON object is extracted from the reply and normalized into `AIOutput`; HTTP errors and empty/invalid responses throw.
+4. `groq` → `analyzeWithGroq()` (`src/services/ai/providers/groq.ts`) sends `POST https://api.groq.com/openai/v1/chat/completions` using `llama-3.3-70b-versatile`. 30-second AbortController timeout. Typical response: 1–3 seconds.
+5. `kimi` → `analyzeWithKimi()` (`src/services/ai/providers/kimi.ts`) sends an OpenAI-compatible `POST {TOKENROUTER_BASE_URL}/chat/completions` request. The prompt is built by `buildPrompt(input)`: it injects available `AIInput` fields as track context and instructs the model to classify using the ForzaDJ taxonomy only (genres: Afro House, Baile Funk, Bass House, Breaks, EDM, Garage, Hip-Hop, House, Jersey Club, Open Format, Pop, Rus, Tech House; moods: Warm Up, Prime Time, After Party; versions: Original, Extended, Remix, Mashup; rating: 1–5 integer). Falls back to "Open Format" if genre is uncertain. Returns JSON only. The JSON object is extracted from the reply and normalized into `AIOutput`; HTTP errors and empty/invalid responses throw.
 5. The bot calls `analyzeTrack(metadataInput)` from `src/handlers/audio.ts`; `metadataInput` is built from real parsed metadata (artist, title, album, year, duration, bitrate, sampleRate, channels, codec, format, embeddedGenre — only present fields are included). `scripts/test-kimi.ts` is a standalone test.
 6. Planned future providers (not implemented): openai, gemini, ollama.
 
@@ -126,7 +128,7 @@ Never include real secret values anywhere in the repository.
 14. `a5b99d9` **Integrate Telegram Bot with ForzaDJ API** — `forzadj-api.ts` sends multipart POST to `POST /api/bot/upload` (new endpoint in forzadjbeta); `pending.ts` holds track state between audio handler and publish callback; `callbacks.ts` wired to real publish. Both builds pass.
 15. `af0baed` **Verify complete publication pipeline** — full end-to-end audit. Architecture confirmed correct. Site endpoint committed (`a4b4db5` in forzadjbeta). Env vars configured in both `.env` files.
 16. `8638706` **Fix multipart upload** — `forzadj-api.ts`: non-ASCII (Cyrillic) filenames from Telegram broke RFC 7578 multipart `Content-Disposition` header → Next.js/undici parser threw "Invalid multipart body". Fix: use `track.{ext}` as the safe ASCII FormData filename; original filename preserved in `metadata.fileName` → stored as `Asset.originalName` in DB. Real Telegram test passed.
-17. *(current)* **Map AI energy to Studio** — `forzadj-api.ts`: `pub.aiResult?.rating` was not sent to the API at all. Fix: add `energy: pub.aiResult?.rating` to the `metadata` JSON payload (using the site's term `energy`). Site `/api/bot/upload`: added `energy?` field to `BotUploadMetadata`; calls `trackVersionRepository.update(version.id, { energy })` after upload.
+17. `5e00f36` **Map AI energy to Studio** — `forzadj-api.ts`: `pub.aiResult?.rating` was not sent to the API at all. Fix: add `energy: pub.aiResult?.rating` to the `metadata` JSON payload (using the site's term `energy`). Site `/api/bot/upload`: added `energy?` field to `BotUploadMetadata`; calls `trackVersionRepository.update(version.id, { energy })` after upload.
 
 # Pipeline Verification Results (2026-08-04)
 
@@ -182,9 +184,10 @@ Full end-to-end audit completed. No code bugs found. Summary:
 
 # Next Planned Step
 
-1. Send MP3 via Telegram → press Publish → verify Energy 1–5 autofilled in Studio.
-2. Open Studio, fill in remaining metadata, publish track to pool.
-3. Resolve Kimi AI provider (TokenRouter 403 issue) or migrate to DeepSeek V3.
+1. Send MP3 via Telegram → verify AI responds in <10 seconds with Groq.
+2. Press Publish → verify Energy 1–5 autofilled in Studio.
+3. Implement branded ForzaDJ artwork per genre (Этап B).
+4. Implement auto-publish to catalog without manual Studio step (Этап C).
 
 # Future Roadmap
 
