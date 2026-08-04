@@ -21,7 +21,7 @@ src/
 │   ├── ai.ts                         # getAIProvider(): reads/validates AI_PROVIDER ("mock" | "kimi")
 │   └── auth.ts                       # isAllowedTelegramUser(): parses/validates ALLOWED_TELEGRAM_IDS at startup
 ├── handlers/
-│   └── audio.ts                      # createAudioHandler(token): file-type validation, orchestrates download → metadata, sends reply
+│   └── audio.ts                      # createAudioHandler(token): file-type validation, orchestrates download → metadata → AI → 4-section preview reply
 ├── services/
 │   ├── telegram-download.ts          # Downloads file from Telegram, saves to temp/YYYY-MM-DD/, collision → _HHMMSS suffix
 │   ├── audio-metadata.ts             # extractAudioMetadata(): music-metadata parse → { block: string; input: AIInput }
@@ -82,8 +82,12 @@ Never include real secret values anywhere in the repository.
    - Downloads via `ctx.api.getFile` + fetch, writes the file locally.
    - On download failure replies `⚠️ Failed to download the file from Telegram.`.
    - Extracts metadata from the saved file.
-   - Calls `analyzeTrack(metadataInput)` with real parsed metadata; on error appends `⚠️ AI analysis failed.` instead.
-   - Replies with: `✅ Audio saved` + file name + path + size + `📋 Metadata` block + `🤖 AI Analysis` block.
+   - Calls `analyzeTrack(metadataInput)` with real parsed metadata; on error shows `⚠️ Analysis failed.` inside the AI section.
+   - Replies with a 4-section publication preview:
+     - `🎵 File` — filename, path, size
+     - `📀 Metadata` — full parsed metadata fields
+     - `🤖 AI Analysis` — genre, mood, version, star rating (★★★★★)
+     - `📤 Publication` — `Status: Готово к проверке` (no actual publishing)
 4. No upload, no database, no queue.
 
 # Security
@@ -107,15 +111,17 @@ Never include real secret values anywhere in the repository.
 8. `fa49d30` **Add Telegram access control** — private-chat-only + `ALLOWED_TELEGRAM_IDS` allowlist middleware with `⛔ Access denied.`
 9. `62340df` **Integrate AI into Telegram workflow** — `analyzeTrack({})` called from `audio.ts` after metadata extraction; `🤖 AI Analysis` block appended to reply; errors degrade gracefully to `⚠️ AI analysis failed.`
 10. `99010da` **Pass real metadata to AI** — `extractAudioMetadata()` now returns `{ block, input }`: `block` is the unchanged Telegram string, `input` is a real `AIInput` built from parsed fields (only present values). `AIInput` gained `year`. `analyzeTrack({})` → `analyzeTrack(metadataInput)`.
-11. *(current)* **Improve Kimi classification prompt** — replaced static test prompt with `buildPrompt(input)` that injects available track metadata and enforces the ForzaDJ taxonomy (13 genres, 3 moods, 4 versions, rating 1–5). Model must use only listed values; falls back to "Open Format" if genre uncertain. Returns JSON only.
+11. `858b889` **Improve Kimi classification prompt** — replaced static test prompt with `buildPrompt(input)` that injects available track metadata and enforces the ForzaDJ taxonomy (13 genres, 3 moods, 4 versions, rating 1–5). Model must use only listed values; falls back to "Open Format" if genre uncertain. Returns JSON only.
+12. *(current)* **Add publication preview** — restructured Telegram reply into 4 sections (🎵 File / 📀 Metadata / 🤖 AI Analysis / 📤 Publication). Star rating added. No actual publishing — `Status: Готово к проверке` is display-only.
 
 # Next Planned Step
 
-Investigate Kimi API 403 error (key expired or model unavailable) and restore live AI output, or switch to an alternative provider.
+Resolve Kimi API 403 error (key expired or model unavailable) or migrate to DeepSeek V3 / Qwen2.5 for more reliable free-tier AI classification.
 
 # Future Roadmap
 
-1. Resolve Kimi API 403 — verify key and model, rotate if needed.
+1. Resolve Kimi API 403 or migrate to DeepSeek V3 / Qwen2.5 (OpenAI-compatible, better reliability).
+2. Implement actual publication flow: send approved track metadata to the ForzaDJ website API.
 3. Additional AI providers (openai, gemini, ollama) behind the same `AI_PROVIDER` switch.
 4. Upload flow to the ForzaDJ website API.
 5. Database for track records.

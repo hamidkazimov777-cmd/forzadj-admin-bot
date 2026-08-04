@@ -11,6 +11,11 @@ function isAudioFile(fileName: string | undefined, mimeType: string | undefined)
   return mimeType?.startsWith("audio/") ?? false;
 }
 
+function ratingStars(n: number): string {
+  const filled = Math.min(5, Math.max(1, Math.round(n)));
+  return "★".repeat(filled) + "☆".repeat(5 - filled);
+}
+
 export function createAudioHandler(token: string) {
   return async function handleAudio(
     ctx: Context,
@@ -29,27 +34,38 @@ export function createAudioHandler(token: string) {
 
     const { block: metadataBlock, input: metadataInput } = await extractAudioMetadata(downloaded.savePath);
 
-    let aiBlock: string;
+    // Replace the internal "📋 Metadata" header with the new "📀 Metadata" section header.
+    const METADATA_HEADER = "📋 Metadata\n\n";
+    const metadataBody = metadataBlock.startsWith(METADATA_HEADER)
+      ? metadataBlock.slice(METADATA_HEADER.length)
+      : metadataBlock;
+
+    let aiSection: string;
     try {
       const ai = await analyzeTrack(metadataInput);
-      aiBlock =
+      aiSection =
         "🤖 AI Analysis\n\n" +
-        `Genre:\n${ai.genre}\n\n` +
-        `Mood:\n${ai.mood}\n\n` +
-        `Version:\n${ai.version}\n\n` +
-        `Rating:\n${ai.rating}`;
+        `Genre: ${ai.genre}\n` +
+        `Mood: ${ai.mood}\n` +
+        `Version: ${ai.version}\n` +
+        `Rating: ${ratingStars(ai.rating)} (${ai.rating}/5)`;
     } catch {
-      aiBlock = "⚠️ AI analysis failed.";
+      aiSection = "🤖 AI Analysis\n\n⚠️ Analysis failed.";
     }
 
-    await ctx.reply(
-      "✅ Audio saved\n\n" +
-        `File:\n${downloaded.saveName}\n\n` +
-        `Saved to:\n${downloaded.savePath}\n\n` +
-        `Size:\n${downloaded.sizeMB} MB (${downloaded.fileSize} bytes)\n\n` +
-        metadataBlock +
-        "\n\n" +
-        aiBlock
-    );
+    const reply =
+      "🎵 File\n\n" +
+      `${downloaded.saveName}\n` +
+      `Saved to: ${downloaded.savePath}\n` +
+      `Size: ${downloaded.sizeMB} MB (${downloaded.fileSize} bytes)\n\n` +
+      "📀 Metadata\n\n" +
+      metadataBody +
+      "\n\n" +
+      aiSection +
+      "\n\n" +
+      "📤 Publication\n\n" +
+      "Status: Готово к проверке";
+
+    await ctx.reply(reply);
   };
 }
