@@ -1,4 +1,5 @@
 import { getAIProvider } from "../../config/ai";
+import { analyzeWithKimi } from "./providers/kimi";
 import type { AIInput, AIOutput } from "./types";
 
 // Mock provider: no external calls, returns fixed values.
@@ -12,11 +13,12 @@ async function analyzeWithMock(_input: AIInput): Promise<AIOutput> {
 }
 
 // Selects the AI provider based on the AI_PROVIDER environment variable.
-// Currently only "mock" is implemented.
 export async function analyzeTrack(input: AIInput): Promise<AIOutput> {
   const provider = getAIProvider();
   switch (provider) {
     case "mock":
       return analyzeWithMock(input);
+    case "kimi":
+      return analyzeWithKimi(input);
   }
 }
