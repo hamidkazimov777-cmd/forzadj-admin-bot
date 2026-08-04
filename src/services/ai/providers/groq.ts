@@ -20,7 +20,16 @@ export async function analyzeWithGroq(input: AIInput): Promise<AIOutput> {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        messages: [{ role: "user", content: buildPrompt(input) }],
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a professional DJ and music classifier for the ForzaDJ platform. " +
+              "Follow the classification rules exactly. " +
+              "Return only valid JSON with no extra text.",
+          },
+          { role: "user", content: buildPrompt(input) },
+        ],
         temperature: 0,
         max_tokens: 64,
       }),
