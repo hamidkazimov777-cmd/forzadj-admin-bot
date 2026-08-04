@@ -1,12 +1,22 @@
+import { getAIProvider } from "../../config/ai";
 import type { AIInput, AIOutput } from "./types";
 
-// Placeholder AI provider. Does NOT call any external AI model yet.
-// Returns mock values until a real model is wired in.
-export async function analyzeTrack(_input: AIInput): Promise<AIOutput> {
+// Mock provider: no external calls, returns fixed values.
+async function analyzeWithMock(_input: AIInput): Promise<AIOutput> {
   return {
     genre: "House",
     mood: "Primetime",
     version: "Extended",
     rating: 5,
   };
+}
+
+// Selects the AI provider based on the AI_PROVIDER environment variable.
+// Currently only "mock" is implemented.
+export async function analyzeTrack(input: AIInput): Promise<AIOutput> {
+  const provider = getAIProvider();
+  switch (provider) {
+    case "mock":
+      return analyzeWithMock(input);
+  }
 }
