@@ -20,6 +20,10 @@ export async function publishTrack(pub: PendingPublication): Promise<PublishResu
   const fileBuffer = await fs.readFile(pub.filePath);
   const fileBlob = new Blob([fileBuffer], { type: pub.mimeType });
 
+  const artworkBlob = pub.artworkPath
+    ? new Blob([await fs.readFile(pub.artworkPath)], { type: "image/png" })
+    : null;
+
   const metadata = {
     title: pub.metadataInput.title,
     artist: pub.metadataInput.artist,
@@ -41,6 +45,9 @@ export async function publishTrack(pub: PendingPublication): Promise<PublishResu
   const form = new FormData();
   form.append("file", fileBlob, safeFileName);
   form.append("metadata", JSON.stringify(metadata));
+  if (artworkBlob) {
+    form.append("artwork", artworkBlob, "artwork.png");
+  }
 
   const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/bot/upload`, {
     method: "POST",

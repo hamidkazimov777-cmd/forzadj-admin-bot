@@ -6,6 +6,7 @@ export interface PendingPublication {
   mimeType: string;
   metadataInput: AIInput;
   aiResult: AIOutput | null;
+  artworkPath: string | null;
 }
 
 // Keyed by chatId. Single-admin bot — one pending publication per chat at a time.

@@ -3,6 +3,7 @@ import { downloadTelegramFile } from "../services/telegram-download";
 import { extractAudioMetadata } from "../services/audio-metadata";
 import { analyzeTrack } from "../services/ai/provider";
 import { pendingStore } from "../services/pending";
+import { getArtworkPath } from "../services/artwork";
 import type { AIOutput } from "../services/ai/types";
 
 const AUDIO_EXTENSIONS = [".mp3", ".wav", ".flac", ".aiff"];
@@ -44,14 +45,17 @@ export function createAudioHandler(token: string) {
 
     let aiSection: string;
     let aiResult: AIOutput | null = null;
+    let artworkPath: string | null = null;
     try {
       aiResult = await analyzeTrack(metadataInput);
+      artworkPath = await getArtworkPath(aiResult.genre);
       aiSection =
         "🤖 AI Analysis\n\n" +
         `Genre: ${aiResult.genre}\n` +
         `Mood: ${aiResult.mood}\n` +
         `Version: ${aiResult.version}\n` +
-        `Rating: ${ratingStars(aiResult.rating)} (${aiResult.rating}/5)`;
+        `Rating: ${ratingStars(aiResult.rating)} (${aiResult.rating}/5)\n` +
+        `Artwork: ${artworkPath ? `✅ ${aiResult.genre}` : "⚠️ не найдена"}`;
     } catch {
       aiSection = "🤖 AI Analysis\n\n⚠️ Analysis failed.";
     }
@@ -82,6 +86,7 @@ export function createAudioHandler(token: string) {
         mimeType: file.mime_type ?? "application/octet-stream",
         metadataInput,
         aiResult,
+        artworkPath,
       });
     }
 

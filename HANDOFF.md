@@ -128,7 +128,8 @@ Never include real secret values anywhere in the repository.
 14. `a5b99d9` **Integrate Telegram Bot with ForzaDJ API** — `forzadj-api.ts` sends multipart POST to `POST /api/bot/upload` (new endpoint in forzadjbeta); `pending.ts` holds track state between audio handler and publish callback; `callbacks.ts` wired to real publish. Both builds pass.
 15. `af0baed` **Verify complete publication pipeline** — full end-to-end audit. Architecture confirmed correct. Site endpoint committed (`a4b4db5` in forzadjbeta). Env vars configured in both `.env` files.
 16. `8638706` **Fix multipart upload** — `forzadj-api.ts`: non-ASCII (Cyrillic) filenames from Telegram broke RFC 7578 multipart `Content-Disposition` header → Next.js/undici parser threw "Invalid multipart body". Fix: use `track.{ext}` as the safe ASCII FormData filename; original filename preserved in `metadata.fileName` → stored as `Asset.originalName` in DB. Real Telegram test passed.
-17. `5e00f36` **Map AI energy to Studio** — `forzadj-api.ts`: `pub.aiResult?.rating` was not sent to the API at all. Fix: add `energy: pub.aiResult?.rating` to the `metadata` JSON payload (using the site's term `energy`). Site `/api/bot/upload`: added `energy?` field to `BotUploadMetadata`; calls `trackVersionRepository.update(version.id, { energy })` after upload.
+17. `5e00f36` **Map AI energy to Studio** — `forzadj-api.ts`: `pub.aiResult?.rating` was not sent to the API at all. Fix: add `energy: pub.aiResult?.rating` to the `metadata` JSON payload.
+18. *(current)* **Add branded artwork** — `assets/artwork/` folder with 13 PNG covers (one per genre). `services/artwork.ts`: `getArtworkPath(genre)` maps genre → file path with `open-format.png` fallback. `audio.ts`: selects artwork after AI analysis, shows `Artwork: ✅ Genre` in Telegram preview, stores `artworkPath` in `PendingPublication`. `forzadj-api.ts`: reads artwork PNG and sends as `artwork` field in FormData. Site `/api/bot/upload`: accepts `artwork` File, uploads to `artwork` Supabase bucket, creates `ARTWORK` asset record. — `forzadj-api.ts`: `pub.aiResult?.rating` was not sent to the API at all. Fix: add `energy: pub.aiResult?.rating` to the `metadata` JSON payload (using the site's term `energy`). Site `/api/bot/upload`: added `energy?` field to `BotUploadMetadata`; calls `trackVersionRepository.update(version.id, { energy })` after upload.
 
 # Pipeline Verification Results (2026-08-04)
 
@@ -184,10 +185,9 @@ Full end-to-end audit completed. No code bugs found. Summary:
 
 # Next Planned Step
 
-1. Send MP3 via Telegram → verify AI responds in <10 seconds with Groq.
-2. Press Publish → verify Energy 1–5 autofilled in Studio.
-3. Implement branded ForzaDJ artwork per genre (Этап B).
-4. Implement auto-publish to catalog without manual Studio step (Этап C).
+1. Send MP3 via Telegram → verify artwork line shows ✅ Genre in preview.
+2. Press Publish → verify ARTWORK asset created in `artwork` bucket on site.
+3. Implement auto-publish to catalog without manual Studio step (Этап C).
 
 # Future Roadmap
 
