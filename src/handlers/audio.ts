@@ -1,9 +1,10 @@
-import { Context, InlineKeyboard } from "grammy";
+import { Context } from "grammy";
 import { downloadTelegramFile } from "../services/telegram-download";
 import { extractAudioMetadata } from "../services/audio-metadata";
 import { analyzeTrack } from "../services/ai/provider";
 import { pendingStore } from "../services/pending";
 import { getArtworkPath } from "../services/artwork";
+import { buildPreviewText, buildPreviewKeyboard } from "./preview";
 import type { AIOutput } from "../services/ai/types";
 
 const AUDIO_EXTENSIONS = [".mp3", ".wav", ".flac", ".aiff"];
@@ -14,15 +15,18 @@ function isAudioFile(fileName: string | undefined, mimeType: string | undefined)
   return mimeType?.startsWith("audio/") ?? false;
 }
 
-function ratingStars(n: number): string {
-  const filled = Math.min(5, Math.max(1, Math.round(n)));
-  return "★".repeat(filled) + "☆".repeat(5 - filled);
-}
-
 export function createAudioHandler(token: string) {
   return async function handleAudio(
     ctx: Context,
-    file: { file_id: string; file_size?: number; file_name?: string; mime_type?: string }
+    file: {
+      file_id: string;
+      file_size?: number;
+      file_name?: string;
+      mime_type?: string;
+      // Telegram extracts these from audio files automatically
+      performer?: string;
+      title?: string;
+    }
   ) {
     if (!isAudioFile(file.file_name, file.mime_type)) {
       await ctx.reply("Unsupported file type.");
@@ -35,61 +39,38 @@ export function createAudioHandler(token: string) {
       return;
     }
 
-    const { block: metadataBlock, input: metadataInput } = await extractAudioMetadata(downloaded.savePath, file.file_name);
+    const { input: metadataInput } = await extractAudioMetadata(downloaded.savePath, file.file_name);
 
-    // Replace the internal "📋 Metadata" header with the new "📀 Metadata" section header.
-    const METADATA_HEADER = "📋 Metadata\n\n";
-    const metadataBody = metadataBlock.startsWith(METADATA_HEADER)
-      ? metadataBlock.slice(METADATA_HEADER.length)
-      : metadataBlock;
+    // Telegram extracts performer/title from the audio file independently.
+    // Use them as fallback when our ID3 parsing and filename parsing both fail.
+    if (!metadataInput.artist && file.performer) {
+      metadataInput.artist = file.performer;
+    }
+    if (!metadataInput.title && file.title) {
+      metadataInput.title = file.title;
+    }
 
-    let aiSection: string;
     let aiResult: AIOutput | null = null;
     let artworkPath: string | null = null;
     try {
       aiResult = await analyzeTrack(metadataInput);
       artworkPath = await getArtworkPath(aiResult.genre);
-      aiSection =
-        "🤖 AI Analysis\n\n" +
-        `Genre: ${aiResult.genre}\n` +
-        `Mood: ${aiResult.mood}\n` +
-        `Version: ${aiResult.version}\n` +
-        `Rating: ${ratingStars(aiResult.rating)} (${aiResult.rating}/5)\n` +
-        `Artwork: ${artworkPath ? `✅ ${aiResult.genre}` : "⚠️ не найдена"}`;
     } catch {
-      aiSection = "🤖 AI Analysis\n\n⚠️ Analysis failed.";
+      // aiResult stays null; preview still shown with edit/publish options
     }
 
-    const reply =
-      "🎵 File\n\n" +
-      `${downloaded.saveName}\n` +
-      `Saved to: ${downloaded.savePath}\n` +
-      `Size: ${downloaded.sizeMB} MB (${downloaded.fileSize} bytes)\n\n` +
-      "📀 Metadata\n\n" +
-      metadataBody +
-      "\n\n" +
-      aiSection +
-      "\n\n" +
-      "📤 Publication\n\n" +
-      "Status: Готово к проверке";
-
-    const keyboard = new InlineKeyboard()
-      .text("✅ Publish", "publish")
-      .text("❌ Cancel", "cancel");
-
-    // Store pending publication so the callback handler can access it.
     const chatId = ctx.chat?.id;
     if (chatId !== undefined) {
-      pendingStore.set(chatId, {
+      const pub = {
         filePath: downloaded.savePath,
         fileName: downloaded.saveName,
         mimeType: file.mime_type ?? "application/octet-stream",
         metadataInput,
         aiResult,
         artworkPath,
-      });
+      };
+      pendingStore.set(chatId, pub);
+      await ctx.reply(buildPreviewText(pub), { reply_markup: buildPreviewKeyboard() });
     }
-
-    await ctx.reply(reply, { reply_markup: keyboard });
   };
 }

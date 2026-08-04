@@ -3,6 +3,8 @@ import "dotenv/config";
 import { createAudioHandler } from "./handlers/audio";
 import { registerCallbackHandlers } from "./handlers/callbacks";
 import { authMiddleware } from "./bot/auth";
+import { pendingStore } from "./services/pending";
+import { buildPreviewText, buildPreviewKeyboard } from "./handlers/preview";
 
 const token = process.env.BOT_TOKEN;
 
@@ -20,6 +22,25 @@ bot.command("start", (ctx) => ctx.reply("👋 ForzaDJ Admin Bot is running."));
 const handleAudio = createAudioHandler(token);
 bot.on("message:audio", (ctx) => handleAudio(ctx, ctx.message.audio));
 bot.on("message:document", (ctx) => handleAudio(ctx, ctx.message.document));
+
+// Handle text input when waiting for edited artist/title
+bot.on("message:text", async (ctx) => {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+  const pending = pendingStore.get(chatId);
+  if (!pending?.waitingFor) return;
+
+  const field = pending.waitingFor;
+  pending.waitingFor = undefined;
+
+  if (field === "artist") {
+    pending.metadataInput.artist = ctx.message.text.trim();
+  } else if (field === "title") {
+    pending.metadataInput.title = ctx.message.text.trim();
+  }
+
+  await ctx.reply(buildPreviewText(pending), { reply_markup: buildPreviewKeyboard() });
+});
 
 registerCallbackHandlers(bot);
 
