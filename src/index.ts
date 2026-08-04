@@ -1,4 +1,5 @@
 import { Bot, Context } from "grammy";
+import { parseFile } from "music-metadata";
 import { mkdir, writeFile, access } from "fs/promises";
 import path from "path";
 import "dotenv/config";
@@ -68,11 +69,44 @@ async function handleAudio(
   const savePath = path.join(dir, saveName);
   await writeFile(savePath, buffer);
 
+  // Extract metadata locally from the saved file
+  let metadataBlock = "Metadata: unavailable (could not parse file)";
+  try {
+    const meta = await parseFile(savePath);
+    const { common, format } = meta;
+    const fmt = (v: unknown) =>
+      v === undefined || v === null || v === "" ? "n/a" : String(v);
+    const seconds =
+      format.duration !== undefined
+        ? `${format.duration.toFixed(1)} s`
+        : "n/a";
+    const kbps =
+      format.bitrate !== undefined
+        ? `${Math.round(format.bitrate / 1000)} kbps`
+        : "n/a";
+    metadataBlock =
+      "📋 Metadata\n\n" +
+      `Artist: ${fmt(common.artist)}\n` +
+      `Title: ${fmt(common.title)}\n` +
+      `Album: ${fmt(common.album)}\n` +
+      `Year: ${fmt(common.year)}\n` +
+      `Duration: ${seconds}\n` +
+      `Bitrate: ${kbps}\n` +
+      `Sample rate: ${fmt(format.sampleRate)} Hz\n` +
+      `Channels: ${fmt(format.numberOfChannels)}\n` +
+      `Codec: ${fmt(format.codec)}\n` +
+      `Container: ${fmt(format.container)}\n` +
+      `ISRC: ${fmt(common.isrc)}`;
+  } catch {
+    // keep fallback metadata message
+  }
+
   await ctx.reply(
     "✅ Audio saved\n\n" +
       `File:\n${saveName}\n\n` +
       `Saved to:\n${savePath}\n\n` +
-      `Size:\n${sizeMB} MB (${fileSize} bytes)`
+      `Size:\n${sizeMB} MB (${fileSize} bytes)\n\n` +
+      metadataBlock
   );
 }
 
