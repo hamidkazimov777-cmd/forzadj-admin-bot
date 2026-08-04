@@ -2,6 +2,8 @@ import { Context, InlineKeyboard } from "grammy";
 import { downloadTelegramFile } from "../services/telegram-download";
 import { extractAudioMetadata } from "../services/audio-metadata";
 import { analyzeTrack } from "../services/ai/provider";
+import { pendingStore } from "../services/pending";
+import type { AIOutput } from "../services/ai/types";
 
 const AUDIO_EXTENSIONS = [".mp3", ".wav", ".flac", ".aiff"];
 
@@ -41,14 +43,15 @@ export function createAudioHandler(token: string) {
       : metadataBlock;
 
     let aiSection: string;
+    let aiResult: AIOutput | null = null;
     try {
-      const ai = await analyzeTrack(metadataInput);
+      aiResult = await analyzeTrack(metadataInput);
       aiSection =
         "🤖 AI Analysis\n\n" +
-        `Genre: ${ai.genre}\n` +
-        `Mood: ${ai.mood}\n` +
-        `Version: ${ai.version}\n` +
-        `Rating: ${ratingStars(ai.rating)} (${ai.rating}/5)`;
+        `Genre: ${aiResult.genre}\n` +
+        `Mood: ${aiResult.mood}\n` +
+        `Version: ${aiResult.version}\n` +
+        `Rating: ${ratingStars(aiResult.rating)} (${aiResult.rating}/5)`;
     } catch {
       aiSection = "🤖 AI Analysis\n\n⚠️ Analysis failed.";
     }
@@ -69,6 +72,18 @@ export function createAudioHandler(token: string) {
     const keyboard = new InlineKeyboard()
       .text("✅ Publish", "publish")
       .text("❌ Cancel", "cancel");
+
+    // Store pending publication so the callback handler can access it.
+    const chatId = ctx.chat?.id;
+    if (chatId !== undefined) {
+      pendingStore.set(chatId, {
+        filePath: downloaded.savePath,
+        fileName: downloaded.saveName,
+        mimeType: file.mime_type ?? "application/octet-stream",
+        metadataInput,
+        aiResult,
+      });
+    }
 
     await ctx.reply(reply, { reply_markup: keyboard });
   };

@@ -21,11 +21,13 @@ src/
 │   ├── ai.ts                         # getAIProvider(): reads/validates AI_PROVIDER ("mock" | "kimi")
 │   └── auth.ts                       # isAllowedTelegramUser(): parses/validates ALLOWED_TELEGRAM_IDS at startup
 ├── handlers/
-│   ├── audio.ts                      # createAudioHandler(token): file-type validation, orchestrates download → metadata → AI → 4-section preview reply + InlineKeyboard
-│   └── callbacks.ts                  # registerCallbackHandlers(bot): "publish" stub + "cancel"; ready for ForzaDJ API integration
+│   ├── audio.ts                      # createAudioHandler(token): file-type validation, orchestrates download → metadata → AI → preview reply + stores PendingPublication
+│   └── callbacks.ts                  # registerCallbackHandlers(bot): "publish" → publishTrack() → ForzaDJ API; "cancel" → clears pending
 ├── services/
 │   ├── telegram-download.ts          # Downloads file from Telegram, saves to temp/YYYY-MM-DD/, collision → _HHMMSS suffix
 │   ├── audio-metadata.ts             # extractAudioMetadata(): music-metadata parse → { block: string; input: AIInput }
+│   ├── pending.ts                    # pendingStore: Map<chatId, PendingPublication> — holds file path + metadata + AI result between audio handler and publish callback
+│   ├── forzadj-api.ts                # publishTrack(pending): multipart POST to FORZADJ_API_URL/api/bot/upload → PublishResult
 │   └── ai/
 │       ├── types.ts                  # AIInput (artist, title, album, year, duration, bitrate, sampleRate, channels, codec, format, embeddedGenre) / AIOutput
 │       ├── provider.ts               # analyzeTrack(): dispatches to mock or kimi based on AI_PROVIDER
@@ -61,6 +63,8 @@ All loaded from `.env` (never committed — `.env` is gitignored; `.env.example`
 - `TOKENROUTER_BASE_URL` — TokenRouter base URL (e.g. `https://api.tokenrouter.com/v1`).
 - `TOKENROUTER_MODEL` — TokenRouter model ID (e.g. `moonshotai/kimi-k3-free`).
 - `ALLOWED_TELEGRAM_IDS` — comma-separated whitelisted Telegram user IDs (e.g. `123456789,987654321`).
+- `FORZADJ_API_URL` — ForzaDJ website base URL (e.g. `https://forzadj.ru`).
+- `FORZADJ_BOT_SECRET` — shared secret matching `BOT_UPLOAD_SECRET` on the ForzaDJ site.
 
 Never include real secret values anywhere in the repository.
 
@@ -90,8 +94,9 @@ Never include real secret values anywhere in the repository.
      - `🤖 AI Analysis` — genre, mood, version, star rating (★★★★★)
      - `📤 Publication` — `Status: Готово к проверке` (no actual publishing)
    - Reply includes `InlineKeyboard` with `✅ Publish` and `❌ Cancel` buttons.
-   - `✅ Publish` → stub reply "Publishing is not implemented yet." (`onPublish` in `callbacks.ts`).
-   - `❌ Cancel` → reply "Publication cancelled." (`onCancel` in `callbacks.ts`).
+   - After reply, saves `PendingPublication` (filePath, fileName, mimeType, metadataInput, aiResult) to `pendingStore` keyed by chatId.
+   - `✅ Publish` → clears pending → removes keyboard → calls `publishTrack()` → replies with trackId + studioUrl or error.
+   - `❌ Cancel` → clears pending → removes keyboard → replies "Publication cancelled."
 4. No upload, no database, no queue.
 
 # Security
@@ -117,17 +122,19 @@ Never include real secret values anywhere in the repository.
 10. `99010da` **Pass real metadata to AI** — `extractAudioMetadata()` now returns `{ block, input }`: `block` is the unchanged Telegram string, `input` is a real `AIInput` built from parsed fields (only present values). `AIInput` gained `year`. `analyzeTrack({})` → `analyzeTrack(metadataInput)`.
 11. `858b889` **Improve Kimi classification prompt** — replaced static test prompt with `buildPrompt(input)` that injects available track metadata and enforces the ForzaDJ taxonomy (13 genres, 3 moods, 4 versions, rating 1–5). Model must use only listed values; falls back to "Open Format" if genre uncertain. Returns JSON only.
 12. `ecb8cfa` **Add publication preview** — restructured Telegram reply into 4 sections (🎵 File / 📀 Metadata / 🤖 AI Analysis / 📤 Publication). Star rating added. No actual publishing — `Status: Готово к проверке` is display-only.
-13. *(current)* **Add publication approval UI** — `InlineKeyboard` with `✅ Publish` / `❌ Cancel` appended to the preview. `callbacks.ts` handles both: Publish is a stub ready for ForzaDJ API integration; Cancel replies and closes.
+13. `d213f77` **Add publication approval UI** — `InlineKeyboard` with `✅ Publish` / `❌ Cancel` appended to the preview. `callbacks.ts` handles both: Publish is a stub ready for ForzaDJ API integration; Cancel replies and closes.
+14. *(current)* **Integrate Telegram Bot with ForzaDJ API** — `forzadj-api.ts` sends multipart POST to `POST /api/bot/upload` (new endpoint in forzadjbeta); `pending.ts` holds track state between audio handler and publish callback; `callbacks.ts` wired to real publish. Both builds pass.
 
 # Next Planned Step
 
-Implement actual publication: wire `onPublish` in `callbacks.ts` to the ForzaDJ website API, passing the approved track metadata.
+Set `FORZADJ_API_URL` and `FORZADJ_BOT_SECRET` in `.env`, and `BOT_UPLOAD_SECRET` in forzadjbeta's `.env`, then test end-to-end publication of a real track.
 
 # Future Roadmap
 
-1. Implement `onPublish` → ForzaDJ API call (fill in the TODO stub in `callbacks.ts`).
-2. Resolve Kimi API 403 or migrate to DeepSeek V3 / Qwen2.5 (OpenAI-compatible, better reliability).
-3. Pass pending track state (file path, AI result) from audio handler to publish callback.
+1. End-to-end test with real credentials (FORZADJ_BOT_SECRET / BOT_UPLOAD_SECRET).
+2. Resolve Kimi API 403 or migrate to DeepSeek V3 / Qwen2.5.
+3. After publication: auto-open Studio edit page link in the reply.
+4. Delete the local temp file after successful publication (optional cleanup).
 3. Additional AI providers (openai, gemini, ollama) behind the same `AI_PROVIDER` switch.
 4. Upload flow to the ForzaDJ website API.
 5. Database for track records.
