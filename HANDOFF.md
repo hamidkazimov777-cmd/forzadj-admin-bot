@@ -124,7 +124,8 @@ Never include real secret values anywhere in the repository.
 12. `ecb8cfa` **Add publication preview** — restructured Telegram reply into 4 sections (🎵 File / 📀 Metadata / 🤖 AI Analysis / 📤 Publication). Star rating added. No actual publishing — `Status: Готово к проверке` is display-only.
 13. `d213f77` **Add publication approval UI** — `InlineKeyboard` with `✅ Publish` / `❌ Cancel` appended to the preview. `callbacks.ts` handles both: Publish is a stub ready for ForzaDJ API integration; Cancel replies and closes.
 14. `a5b99d9` **Integrate Telegram Bot with ForzaDJ API** — `forzadj-api.ts` sends multipart POST to `POST /api/bot/upload` (new endpoint in forzadjbeta); `pending.ts` holds track state between audio handler and publish callback; `callbacks.ts` wired to real publish. Both builds pass.
-15. *(current)* **Verify complete publication pipeline** — full end-to-end audit. Architecture confirmed correct. Site endpoint committed (`a4b4db5` in forzadjbeta). Missing: `FORZADJ_API_URL`, `FORZADJ_BOT_SECRET` in bot `.env`; `BOT_UPLOAD_SECRET` in site `.env` (see Next Planned Step).
+15. `af0baed` **Verify complete publication pipeline** — full end-to-end audit. Architecture confirmed correct. Site endpoint committed (`a4b4db5` in forzadjbeta). Env vars configured in both `.env` files.
+16. *(current)* **Fix multipart upload** — `forzadj-api.ts`: non-ASCII (Cyrillic) filenames from Telegram broke RFC 7578 multipart `Content-Disposition` header → Next.js/undici parser threw "Invalid multipart body". Fix: use `track.{ext}` as the safe ASCII FormData filename; original filename preserved in `metadata.fileName` → stored as `Asset.originalName` in DB. Real Telegram test passed: POST /api/bot/upload 200, track visible in Studio.
 
 # Pipeline Verification Results (2026-08-04)
 
@@ -180,9 +181,9 @@ Full end-to-end audit completed. No code bugs found. Summary:
 
 # Next Planned Step
 
-1. User sends MP3 to bot via Telegram → presses ✅ Publish → verifies Studio link.
-2. After successful Telegram test: open Studio, fill in remaining metadata, publish track to pool.
-3. Resolve Kimi AI provider (TokenRouter 403 issue) or migrate to DeepSeek V3.
+1. Open Studio, fill in remaining metadata, publish track to pool.
+2. Resolve Kimi AI provider (TokenRouter 403 issue) or migrate to DeepSeek V3.
+3. Delete local temp file after successful publication (optional cleanup).
 
 # Future Roadmap
 

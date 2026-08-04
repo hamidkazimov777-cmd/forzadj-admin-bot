@@ -31,8 +31,14 @@ export async function publishTrack(pub: PendingPublication): Promise<PublishResu
     mimeType: pub.mimeType,
   };
 
+  // Content-Disposition filename must be ASCII (RFC 7578). Non-ASCII characters
+  // (Cyrillic, etc.) in the filename break the multipart parser on the server side.
+  // The original filename is preserved in metadata.fileName → Asset.originalName in DB.
+  const ext = (pub.fileName.match(/\.([a-z0-9]+)$/i)?.[1] ?? "mp3").toLowerCase();
+  const safeFileName = `track.${ext}`;
+
   const form = new FormData();
-  form.append("file", fileBlob, pub.fileName);
+  form.append("file", fileBlob, safeFileName);
   form.append("metadata", JSON.stringify(metadata));
 
   const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/bot/upload`, {
