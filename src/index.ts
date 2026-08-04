@@ -1,6 +1,7 @@
 import { Bot } from "grammy";
 import "dotenv/config";
 import { createAudioHandler } from "./handlers/audio";
+import { registerCallbackHandlers } from "./handlers/callbacks";
 import { authMiddleware } from "./bot/auth";
 
 const token = process.env.BOT_TOKEN;
@@ -19,6 +20,8 @@ bot.command("start", (ctx) => ctx.reply("👋 ForzaDJ Admin Bot is running."));
 const handleAudio = createAudioHandler(token);
 bot.on("message:audio", (ctx) => handleAudio(ctx, ctx.message.audio));
 bot.on("message:document", (ctx) => handleAudio(ctx, ctx.message.document));
+
+registerCallbackHandlers(bot);
 
 bot.start();
 console.log("Bot started, polling for updates...");

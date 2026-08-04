@@ -1,4 +1,4 @@
-import { Context } from "grammy";
+import { Context, InlineKeyboard } from "grammy";
 import { downloadTelegramFile } from "../services/telegram-download";
 import { extractAudioMetadata } from "../services/audio-metadata";
 import { analyzeTrack } from "../services/ai/provider";
@@ -66,6 +66,10 @@ export function createAudioHandler(token: string) {
       "📤 Publication\n\n" +
       "Status: Готово к проверке";
 
-    await ctx.reply(reply);
+    const keyboard = new InlineKeyboard()
+      .text("✅ Publish", "publish")
+      .text("❌ Cancel", "cancel");
+
+    await ctx.reply(reply, { reply_markup: keyboard });
   };
 }

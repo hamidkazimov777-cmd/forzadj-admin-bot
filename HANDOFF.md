@@ -14,14 +14,15 @@ This file must be updated after every completed development step, BEFORE creatin
 
 ```
 src/
-├── index.ts                          # Entry point: token check, bot creation, middleware + handler registration, polling start
+├── index.ts                          # Entry point: token check, bot creation, middleware + audio/callback handler registration, polling start
 ├── bot/
 │   └── auth.ts                       # authMiddleware: private chats only + ID allowlist, replies "⛔ Access denied." otherwise
 ├── config/
 │   ├── ai.ts                         # getAIProvider(): reads/validates AI_PROVIDER ("mock" | "kimi")
 │   └── auth.ts                       # isAllowedTelegramUser(): parses/validates ALLOWED_TELEGRAM_IDS at startup
 ├── handlers/
-│   └── audio.ts                      # createAudioHandler(token): file-type validation, orchestrates download → metadata → AI → 4-section preview reply
+│   ├── audio.ts                      # createAudioHandler(token): file-type validation, orchestrates download → metadata → AI → 4-section preview reply + InlineKeyboard
+│   └── callbacks.ts                  # registerCallbackHandlers(bot): "publish" stub + "cancel"; ready for ForzaDJ API integration
 ├── services/
 │   ├── telegram-download.ts          # Downloads file from Telegram, saves to temp/YYYY-MM-DD/, collision → _HHMMSS suffix
 │   ├── audio-metadata.ts             # extractAudioMetadata(): music-metadata parse → { block: string; input: AIInput }
@@ -88,6 +89,9 @@ Never include real secret values anywhere in the repository.
      - `📀 Metadata` — full parsed metadata fields
      - `🤖 AI Analysis` — genre, mood, version, star rating (★★★★★)
      - `📤 Publication` — `Status: Готово к проверке` (no actual publishing)
+   - Reply includes `InlineKeyboard` with `✅ Publish` and `❌ Cancel` buttons.
+   - `✅ Publish` → stub reply "Publishing is not implemented yet." (`onPublish` in `callbacks.ts`).
+   - `❌ Cancel` → reply "Publication cancelled." (`onCancel` in `callbacks.ts`).
 4. No upload, no database, no queue.
 
 # Security
@@ -112,16 +116,18 @@ Never include real secret values anywhere in the repository.
 9. `62340df` **Integrate AI into Telegram workflow** — `analyzeTrack({})` called from `audio.ts` after metadata extraction; `🤖 AI Analysis` block appended to reply; errors degrade gracefully to `⚠️ AI analysis failed.`
 10. `99010da` **Pass real metadata to AI** — `extractAudioMetadata()` now returns `{ block, input }`: `block` is the unchanged Telegram string, `input` is a real `AIInput` built from parsed fields (only present values). `AIInput` gained `year`. `analyzeTrack({})` → `analyzeTrack(metadataInput)`.
 11. `858b889` **Improve Kimi classification prompt** — replaced static test prompt with `buildPrompt(input)` that injects available track metadata and enforces the ForzaDJ taxonomy (13 genres, 3 moods, 4 versions, rating 1–5). Model must use only listed values; falls back to "Open Format" if genre uncertain. Returns JSON only.
-12. *(current)* **Add publication preview** — restructured Telegram reply into 4 sections (🎵 File / 📀 Metadata / 🤖 AI Analysis / 📤 Publication). Star rating added. No actual publishing — `Status: Готово к проверке` is display-only.
+12. `ecb8cfa` **Add publication preview** — restructured Telegram reply into 4 sections (🎵 File / 📀 Metadata / 🤖 AI Analysis / 📤 Publication). Star rating added. No actual publishing — `Status: Готово к проверке` is display-only.
+13. *(current)* **Add publication approval UI** — `InlineKeyboard` with `✅ Publish` / `❌ Cancel` appended to the preview. `callbacks.ts` handles both: Publish is a stub ready for ForzaDJ API integration; Cancel replies and closes.
 
 # Next Planned Step
 
-Resolve Kimi API 403 error (key expired or model unavailable) or migrate to DeepSeek V3 / Qwen2.5 for more reliable free-tier AI classification.
+Implement actual publication: wire `onPublish` in `callbacks.ts` to the ForzaDJ website API, passing the approved track metadata.
 
 # Future Roadmap
 
-1. Resolve Kimi API 403 or migrate to DeepSeek V3 / Qwen2.5 (OpenAI-compatible, better reliability).
-2. Implement actual publication flow: send approved track metadata to the ForzaDJ website API.
+1. Implement `onPublish` → ForzaDJ API call (fill in the TODO stub in `callbacks.ts`).
+2. Resolve Kimi API 403 or migrate to DeepSeek V3 / Qwen2.5 (OpenAI-compatible, better reliability).
+3. Pass pending track state (file path, AI result) from audio handler to publish callback.
 3. Additional AI providers (openai, gemini, ollama) behind the same `AI_PROVIDER` switch.
 4. Upload flow to the ForzaDJ website API.
 5. Database for track records.
