@@ -8,7 +8,7 @@ This file must be updated after every completed development step, BEFORE creatin
 
 - **Project name:** ForzaDJ Admin Bot
 - **Purpose:** A standalone Telegram admin bot that receives audio files, downloads them locally, extracts metadata, and (soon) analyzes tracks with AI (genre, mood, version, rating). Later it will upload tracks to the ForzaDJ website.
-- **Current development stage:** Foundation complete. Bot works end-to-end for receiving/downloading audio, metadata extraction runs, an AI abstraction layer with a working Kimi (TokenRouter) provider exists, and Telegram access control is enforced. AI analysis is NOT yet triggered by the bot.
+- **Current development stage:** Foundation complete. Bot works end-to-end for receiving/downloading audio, metadata extraction runs, AI analysis is integrated and appended to the Telegram reply, and access control is enforced.
 
 # Architecture
 
@@ -48,7 +48,7 @@ Dependencies: `grammy`, `dotenv`, `music-metadata` (runtime); `typescript`, `tsx
 - Extracts metadata locally with `music-metadata`: artist, title, album, year, duration, bitrate, sample rate, channels, codec, container, ISRC.
 - Replies with a formatted save confirmation plus the full metadata block; missing values show `n/a`; parse failure degrades gracefully.
 - Access control: only private chats and whitelisted Telegram user IDs can use the bot; everyone else gets `⛔ Access denied.`.
-- AI layer: configurable provider system (`mock` | `kimi`); Kimi runs through TokenRouter and returns `AIOutput { genre, mood, version, rating }`. Not yet called from the bot.
+- AI layer: configurable provider system (`mock` | `kimi`); Kimi runs through TokenRouter and returns `AIOutput { genre, mood, version, rating }`. Called from the audio handler after metadata extraction.
 
 # Environment Variables
 
@@ -69,7 +69,7 @@ Never include real secret values anywhere in the repository.
 2. It reads `AI_PROVIDER` via `getAIProvider()` (`src/config/ai.ts`); unsupported values throw a clear error.
 3. `mock` → returns fixed values `{ genre: "House", mood: "Primetime", version: "Extended", rating: 5 }` without any network call.
 4. `kimi` → `analyzeWithKimi()` (`src/services/ai/providers/kimi.ts`) sends an OpenAI-compatible `POST {TOKENROUTER_BASE_URL}/chat/completions` request with a test prompt asking for the exact JSON format; the JSON object is extracted from the reply text and validated/normalized into `AIOutput`; HTTP errors and empty/invalid responses throw.
-5. The bot does NOT call AI yet. The only caller is `scripts/test-kimi.ts`.
+5. The bot calls `analyzeTrack({})` from `src/handlers/audio.ts` after metadata extraction. `scripts/test-kimi.ts` is a standalone test.
 6. Planned future providers (not implemented): openai, gemini, ollama.
 
 # Telegram Flow
@@ -81,9 +81,10 @@ Never include real secret values anywhere in the repository.
    - Creates `temp/YYYY-MM-DD/` if needed; resolves filename collisions with `_HHMMSS`.
    - Downloads via `ctx.api.getFile` + fetch, writes the file locally.
    - On download failure replies `⚠️ Failed to download the file from Telegram.`.
-   - Extracts metadata from the saved file and replies with:
-     `✅ Audio saved` + file name + path + size + `📋 Metadata` block.
-4. No AI is triggered, no upload, no database, no queue.
+   - Extracts metadata from the saved file.
+   - Calls `analyzeTrack({})` using the configured AI provider; on error appends `⚠️ AI analysis failed.` instead.
+   - Replies with: `✅ Audio saved` + file name + path + size + `📋 Metadata` block + `🤖 AI Analysis` block.
+4. No upload, no database, no queue.
 
 # Security
 
@@ -104,15 +105,15 @@ Never include real secret values anywhere in the repository.
 6. `4475df1` **Add Kimi provider** — `providers/kimi.ts` (TokenRouter) implemented but not wired in.
 7. `8722db3` **Activate Kimi provider** — `kimi` added to supported providers; `analyzeTrack()` dispatches; `scripts/test-kimi.ts` verified live output.
 8. `fa49d30` **Add Telegram access control** — private-chat-only + `ALLOWED_TELEGRAM_IDS` allowlist middleware with `⛔ Access denied.`
+9. *(current)* **Integrate AI into Telegram workflow** — `analyzeTrack({})` called from `audio.ts` after metadata extraction; `🤖 AI Analysis` block appended to reply; errors degrade gracefully to `⚠️ AI analysis failed.`
 
 # Next Planned Step
 
-Integrate the AI analysis into the Telegram bot reply: after a file is saved and metadata is extracted, call `analyzeTrack()` (provider selected via `AI_PROVIDER`) and append the AI result (genre, mood, version, rating) to the bot's reply in a formatted block.
+Refine the AI prompt to pass real extracted metadata (artist, title, duration, bitrate, etc.) as context into `analyzeTrack()`.
 
 # Future Roadmap
 
-1. Connect AI analysis to the audio handler (append result to reply).
-2. Refine the AI prompt to use real extracted metadata as context.
+1. Refine the AI prompt to use real extracted metadata as context.
 3. Additional AI providers (openai, gemini, ollama) behind the same `AI_PROVIDER` switch.
 4. Upload flow to the ForzaDJ website API.
 5. Database for track records.

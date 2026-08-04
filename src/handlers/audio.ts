@@ -1,6 +1,7 @@
 import { Context } from "grammy";
 import { downloadTelegramFile } from "../services/telegram-download";
 import { extractAudioMetadata } from "../services/audio-metadata";
+import { analyzeTrack } from "../services/ai/provider";
 
 const AUDIO_EXTENSIONS = [".mp3", ".wav", ".flac", ".aiff"];
 
@@ -28,12 +29,27 @@ export function createAudioHandler(token: string) {
 
     const metadataBlock = await extractAudioMetadata(downloaded.savePath);
 
+    let aiBlock: string;
+    try {
+      const ai = await analyzeTrack({});
+      aiBlock =
+        "🤖 AI Analysis\n\n" +
+        `Genre:\n${ai.genre}\n\n` +
+        `Mood:\n${ai.mood}\n\n` +
+        `Version:\n${ai.version}\n\n` +
+        `Rating:\n${ai.rating}`;
+    } catch {
+      aiBlock = "⚠️ AI analysis failed.";
+    }
+
     await ctx.reply(
       "✅ Audio saved\n\n" +
         `File:\n${downloaded.saveName}\n\n` +
         `Saved to:\n${downloaded.savePath}\n\n` +
         `Size:\n${downloaded.sizeMB} MB (${downloaded.fileSize} bytes)\n\n` +
-        metadataBlock
+        metadataBlock +
+        "\n\n" +
+        aiBlock
     );
   };
 }
