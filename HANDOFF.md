@@ -29,7 +29,7 @@ src/
 │       ├── types.ts                  # AIInput (artist, title, album, year, duration, bitrate, sampleRate, channels, codec, format, embeddedGenre) / AIOutput
 │       ├── provider.ts               # analyzeTrack(): dispatches to mock or kimi based on AI_PROVIDER
 │       └── providers/
-│           └── kimi.ts               # analyzeWithKimi(): TokenRouter (OpenAI-compatible) fetch, test prompt, JSON → AIOutput
+│           └── kimi.ts               # analyzeWithKimi(): TokenRouter fetch; buildPrompt() injects AIInput + ForzaDJ taxonomy; JSON → AIOutput
 └── utils/                            # (empty, reserved)
 
 scripts/
@@ -68,7 +68,7 @@ Never include real secret values anywhere in the repository.
 1. `analyzeTrack(input: AIInput)` in `src/services/ai/provider.ts` is the single entry point.
 2. It reads `AI_PROVIDER` via `getAIProvider()` (`src/config/ai.ts`); unsupported values throw a clear error.
 3. `mock` → returns fixed values `{ genre: "House", mood: "Primetime", version: "Extended", rating: 5 }` without any network call.
-4. `kimi` → `analyzeWithKimi()` (`src/services/ai/providers/kimi.ts`) sends an OpenAI-compatible `POST {TOKENROUTER_BASE_URL}/chat/completions` request with a test prompt asking for the exact JSON format; the JSON object is extracted from the reply text and validated/normalized into `AIOutput`; HTTP errors and empty/invalid responses throw.
+4. `kimi` → `analyzeWithKimi()` (`src/services/ai/providers/kimi.ts`) sends an OpenAI-compatible `POST {TOKENROUTER_BASE_URL}/chat/completions` request. The prompt is built by `buildPrompt(input)`: it injects available `AIInput` fields as track context and instructs the model to classify using the ForzaDJ taxonomy only (genres: Afro House, Baile Funk, Bass House, Breaks, EDM, Garage, Hip-Hop, House, Jersey Club, Open Format, Pop, Rus, Tech House; moods: Warm Up, Prime Time, After Party; versions: Original, Extended, Remix, Mashup; rating: 1–5 integer). Falls back to "Open Format" if genre is uncertain. Returns JSON only. The JSON object is extracted from the reply and normalized into `AIOutput`; HTTP errors and empty/invalid responses throw.
 5. The bot calls `analyzeTrack(metadataInput)` from `src/handlers/audio.ts`; `metadataInput` is built from real parsed metadata (artist, title, album, year, duration, bitrate, sampleRate, channels, codec, format, embeddedGenre — only present fields are included). `scripts/test-kimi.ts` is a standalone test.
 6. Planned future providers (not implemented): openai, gemini, ollama.
 
@@ -106,15 +106,16 @@ Never include real secret values anywhere in the repository.
 7. `8722db3` **Activate Kimi provider** — `kimi` added to supported providers; `analyzeTrack()` dispatches; `scripts/test-kimi.ts` verified live output.
 8. `fa49d30` **Add Telegram access control** — private-chat-only + `ALLOWED_TELEGRAM_IDS` allowlist middleware with `⛔ Access denied.`
 9. `62340df` **Integrate AI into Telegram workflow** — `analyzeTrack({})` called from `audio.ts` after metadata extraction; `🤖 AI Analysis` block appended to reply; errors degrade gracefully to `⚠️ AI analysis failed.`
-10. *(current)* **Pass real metadata to AI** — `extractAudioMetadata()` now returns `{ block, input }`: `block` is the unchanged Telegram string, `input` is a real `AIInput` built from parsed fields (only present values). `AIInput` gained `year`. `analyzeTrack({})` → `analyzeTrack(metadataInput)`.
+10. `99010da` **Pass real metadata to AI** — `extractAudioMetadata()` now returns `{ block, input }`: `block` is the unchanged Telegram string, `input` is a real `AIInput` built from parsed fields (only present values). `AIInput` gained `year`. `analyzeTrack({})` → `analyzeTrack(metadataInput)`.
+11. *(current)* **Improve Kimi classification prompt** — replaced static test prompt with `buildPrompt(input)` that injects available track metadata and enforces the ForzaDJ taxonomy (13 genres, 3 moods, 4 versions, rating 1–5). Model must use only listed values; falls back to "Open Format" if genre uncertain. Returns JSON only.
 
 # Next Planned Step
 
-Refine the Kimi prompt to actually use the `AIInput` fields when building the request (currently the prompt is a static test string that ignores the input).
+Investigate Kimi API 403 error (key expired or model unavailable) and restore live AI output, or switch to an alternative provider.
 
 # Future Roadmap
 
-1. Refine the Kimi prompt to use `AIInput` fields as context (currently uses a static test prompt).
+1. Resolve Kimi API 403 — verify key and model, rotate if needed.
 3. Additional AI providers (openai, gemini, ollama) behind the same `AI_PROVIDER` switch.
 4. Upload flow to the ForzaDJ website API.
 5. Database for track records.
