@@ -34,9 +34,10 @@ export async function extractAudioMetadata(
         ? `${Math.round(format.bitrate / 1000)} kbps`
         : "n/a";
 
-    // Fall back to filename parsing when ID3 artist/title tags are missing.
+    // Fall back to filename parsing when ID3 artist tag is missing.
+    // Many DJ tracks have an ID3 title but no artist — so check artist only.
     const fallback =
-      !common.artist && !common.title && originalFileName
+      !common.artist && originalFileName
         ? parseArtistTitle(originalFileName)
         : {};
     const artist = common.artist || fallback.artist;
