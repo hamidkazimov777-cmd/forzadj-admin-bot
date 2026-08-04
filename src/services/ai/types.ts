@@ -2,6 +2,7 @@ export interface AIInput {
   artist?: string;
   title?: string;
   album?: string;
+  year?: number;
   duration?: number;
   bitrate?: number;
   sampleRate?: number;

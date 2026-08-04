@@ -27,11 +27,11 @@ export function createAudioHandler(token: string) {
       return;
     }
 
-    const metadataBlock = await extractAudioMetadata(downloaded.savePath);
+    const { block: metadataBlock, input: metadataInput } = await extractAudioMetadata(downloaded.savePath);
 
     let aiBlock: string;
     try {
-      const ai = await analyzeTrack({});
+      const ai = await analyzeTrack(metadataInput);
       aiBlock =
         "🤖 AI Analysis\n\n" +
         `Genre:\n${ai.genre}\n\n` +

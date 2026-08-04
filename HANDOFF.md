@@ -24,9 +24,9 @@ src/
 │   └── audio.ts                      # createAudioHandler(token): file-type validation, orchestrates download → metadata, sends reply
 ├── services/
 │   ├── telegram-download.ts          # Downloads file from Telegram, saves to temp/YYYY-MM-DD/, collision → _HHMMSS suffix
-│   ├── audio-metadata.ts             # extractAudioMetadata(): music-metadata parse → formatted "📋 Metadata" block
+│   ├── audio-metadata.ts             # extractAudioMetadata(): music-metadata parse → { block: string; input: AIInput }
 │   └── ai/
-│       ├── types.ts                  # AIInput / AIOutput interfaces
+│       ├── types.ts                  # AIInput (artist, title, album, year, duration, bitrate, sampleRate, channels, codec, format, embeddedGenre) / AIOutput
 │       ├── provider.ts               # analyzeTrack(): dispatches to mock or kimi based on AI_PROVIDER
 │       └── providers/
 │           └── kimi.ts               # analyzeWithKimi(): TokenRouter (OpenAI-compatible) fetch, test prompt, JSON → AIOutput
@@ -69,7 +69,7 @@ Never include real secret values anywhere in the repository.
 2. It reads `AI_PROVIDER` via `getAIProvider()` (`src/config/ai.ts`); unsupported values throw a clear error.
 3. `mock` → returns fixed values `{ genre: "House", mood: "Primetime", version: "Extended", rating: 5 }` without any network call.
 4. `kimi` → `analyzeWithKimi()` (`src/services/ai/providers/kimi.ts`) sends an OpenAI-compatible `POST {TOKENROUTER_BASE_URL}/chat/completions` request with a test prompt asking for the exact JSON format; the JSON object is extracted from the reply text and validated/normalized into `AIOutput`; HTTP errors and empty/invalid responses throw.
-5. The bot calls `analyzeTrack({})` from `src/handlers/audio.ts` after metadata extraction. `scripts/test-kimi.ts` is a standalone test.
+5. The bot calls `analyzeTrack(metadataInput)` from `src/handlers/audio.ts`; `metadataInput` is built from real parsed metadata (artist, title, album, year, duration, bitrate, sampleRate, channels, codec, format, embeddedGenre — only present fields are included). `scripts/test-kimi.ts` is a standalone test.
 6. Planned future providers (not implemented): openai, gemini, ollama.
 
 # Telegram Flow
@@ -82,7 +82,7 @@ Never include real secret values anywhere in the repository.
    - Downloads via `ctx.api.getFile` + fetch, writes the file locally.
    - On download failure replies `⚠️ Failed to download the file from Telegram.`.
    - Extracts metadata from the saved file.
-   - Calls `analyzeTrack({})` using the configured AI provider; on error appends `⚠️ AI analysis failed.` instead.
+   - Calls `analyzeTrack(metadataInput)` with real parsed metadata; on error appends `⚠️ AI analysis failed.` instead.
    - Replies with: `✅ Audio saved` + file name + path + size + `📋 Metadata` block + `🤖 AI Analysis` block.
 4. No upload, no database, no queue.
 
@@ -105,15 +105,16 @@ Never include real secret values anywhere in the repository.
 6. `4475df1` **Add Kimi provider** — `providers/kimi.ts` (TokenRouter) implemented but not wired in.
 7. `8722db3` **Activate Kimi provider** — `kimi` added to supported providers; `analyzeTrack()` dispatches; `scripts/test-kimi.ts` verified live output.
 8. `fa49d30` **Add Telegram access control** — private-chat-only + `ALLOWED_TELEGRAM_IDS` allowlist middleware with `⛔ Access denied.`
-9. *(current)* **Integrate AI into Telegram workflow** — `analyzeTrack({})` called from `audio.ts` after metadata extraction; `🤖 AI Analysis` block appended to reply; errors degrade gracefully to `⚠️ AI analysis failed.`
+9. `62340df` **Integrate AI into Telegram workflow** — `analyzeTrack({})` called from `audio.ts` after metadata extraction; `🤖 AI Analysis` block appended to reply; errors degrade gracefully to `⚠️ AI analysis failed.`
+10. *(current)* **Pass real metadata to AI** — `extractAudioMetadata()` now returns `{ block, input }`: `block` is the unchanged Telegram string, `input` is a real `AIInput` built from parsed fields (only present values). `AIInput` gained `year`. `analyzeTrack({})` → `analyzeTrack(metadataInput)`.
 
 # Next Planned Step
 
-Refine the AI prompt to pass real extracted metadata (artist, title, duration, bitrate, etc.) as context into `analyzeTrack()`.
+Refine the Kimi prompt to actually use the `AIInput` fields when building the request (currently the prompt is a static test string that ignores the input).
 
 # Future Roadmap
 
-1. Refine the AI prompt to use real extracted metadata as context.
+1. Refine the Kimi prompt to use `AIInput` fields as context (currently uses a static test prompt).
 3. Additional AI providers (openai, gemini, ollama) behind the same `AI_PROVIDER` switch.
 4. Upload flow to the ForzaDJ website API.
 5. Database for track records.
