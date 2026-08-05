@@ -1,4 +1,9 @@
 import fs from "fs/promises";
+// Node's global fetch is backed by its own internal (built-in) undici, which
+// isn't guaranteed to be interface-compatible with a separately installed
+// undici package's Agent/Dispatcher. Using this package's own fetch alongside
+// its own Agent keeps both on the same implementation.
+import { fetch, Agent, FormData } from "undici";
 import type { PendingPublication } from "./pending";
 
 export interface PublishResult {
@@ -6,6 +11,17 @@ export interface PublishResult {
   slug: string;
   studioUrl: string;
 }
+
+// Publishes are infrequent and often separated by minutes (the admin reading
+// the AI analysis, editing artist/title, deciding to publish) — long enough
+// for an idle pooled connection to be silently recycled by an intermediate
+// network hop (e.g. the hosting platform's outbound NAT/proxy) while Node's
+// own fetch client still considers it reusable. Reusing that stale socket
+// produces a response with an empty body, which fails with "Unexpected end
+// of JSON input" when parsed. A short keep-alive timeout forces a fresh
+// connection per publish, eliminating the class of bug — the extra TCP/TLS
+// handshake (~100-300ms) is negligible next to the multi-second publish call.
+const freshConnectionAgent = new Agent({ keepAliveTimeout: 1, keepAliveMaxTimeout: 1 });
 
 export async function publishTrack(pub: PendingPublication): Promise<PublishResult> {
   const apiUrl = process.env.FORZADJ_API_URL;
@@ -52,6 +68,7 @@ export async function publishTrack(pub: PendingPublication): Promise<PublishResu
     method: "POST",
     headers: { "x-bot-secret": secret },
     body: form,
+    dispatcher: freshConnectionAgent,
   });
 
   const body = (await res.json()) as

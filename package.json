@@ -12,7 +12,8 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "grammy": "^1.30.0",
-    "music-metadata": "^11.14.0"
+    "music-metadata": "^11.14.0",
+    "undici": "^8.10.0"
   },
   "engines": {
     "node": ">=20"
