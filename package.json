@@ -14,6 +14,9 @@
     "grammy": "^1.30.0",
     "music-metadata": "^11.14.0"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "@types/node": "^22.5.0",
     "tsx": "^4.19.0",
