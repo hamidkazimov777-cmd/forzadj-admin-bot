@@ -5,6 +5,7 @@ import { registerCallbackHandlers } from "./handlers/callbacks";
 import { authMiddleware } from "./bot/auth";
 import { pendingStore } from "./services/pending";
 import { buildPreviewText, buildPreviewKeyboard } from "./handlers/preview";
+import { getArtworkPath } from "./services/artwork";
 
 const token = process.env.BOT_TOKEN;
 
@@ -37,6 +38,9 @@ bot.on("message:text", async (ctx) => {
     pending.metadataInput.artist = ctx.message.text.trim();
   } else if (field === "title") {
     pending.metadataInput.title = ctx.message.text.trim();
+  } else if (field === "genre" && pending.aiResult) {
+    pending.aiResult.genre = ctx.message.text.trim();
+    pending.artworkPath = await getArtworkPath(pending.aiResult.genre);
   }
 
   await ctx.reply(buildPreviewText(pending), { reply_markup: buildPreviewKeyboard() });
