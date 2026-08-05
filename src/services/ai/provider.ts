@@ -1,6 +1,7 @@
 import { getAIProvider } from "../../config/ai";
 import { analyzeWithKimi } from "./providers/kimi";
 import { analyzeWithGroq } from "./providers/groq";
+import { analyzeWithOpenRouter } from "./providers/openrouter";
 import type { AIInput, AIOutput } from "./types";
 
 // Mock provider: no external calls, returns fixed values.
@@ -23,5 +24,7 @@ export async function analyzeTrack(input: AIInput): Promise<AIOutput> {
       return analyzeWithKimi(input);
     case "groq":
       return analyzeWithGroq(input);
+    case "openrouter":
+      return analyzeWithOpenRouter(input);
   }
 }
