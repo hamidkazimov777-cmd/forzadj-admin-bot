@@ -6,6 +6,14 @@ export interface AudioMetadataResult {
   input: AIInput;
 }
 
+const DJ_SERVICE_TAGS =
+  /\s*[\(\[][^\)\]]*\b(intro|outro|muzvizor|radio\s*edit|club\s*edit)\b[^\)\]]*[\)\]]|\s*[-–—]+\s*\b(muzvizor\s+)?(intro|outro|muzvizor)\b\s*$/gi;
+
+function cleanTitle(title: string): string {
+  const cleaned = title.replace(DJ_SERVICE_TAGS, "").trim().replace(/\s+/g, " ");
+  return cleaned || title;
+}
+
 function parseArtistTitle(fileName: string): { artist?: string; title?: string } {
   const base = fileName.replace(/\.[^.]+$/, "");
   const sep = base.indexOf(" - ");
@@ -64,7 +72,7 @@ export async function extractAudioMetadata(
 
     const input: AIInput = {};
     if (artist) input.artist = artist;
-    if (title) input.title = title;
+    if (title) input.title = cleanTitle(title);
     if (common.album) input.album = common.album;
     if (common.year !== undefined) input.year = common.year;
     if (format.duration !== undefined) input.duration = format.duration;

@@ -27,7 +27,6 @@ export async function publishTrack(pub: PendingPublication): Promise<PublishResu
   const metadata = {
     title: pub.metadataInput.title,
     artist: pub.metadataInput.artist,
-    year: pub.metadataInput.year,
     genre: pub.aiResult?.genre,
     mood: pub.aiResult?.mood,
     version: pub.aiResult?.version,
