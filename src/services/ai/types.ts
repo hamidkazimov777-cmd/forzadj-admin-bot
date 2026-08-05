@@ -10,6 +10,7 @@ export interface AIInput {
   codec?: string;
   format?: string;
   embeddedGenre?: string;
+  bpm?: number;
 }
 
 export interface AIOutput {

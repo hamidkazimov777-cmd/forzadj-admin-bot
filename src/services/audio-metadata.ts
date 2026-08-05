@@ -82,6 +82,7 @@ export async function extractAudioMetadata(
     if (format.codec) input.codec = format.codec;
     if (format.container) input.format = format.container;
     if (common.genre?.[0]) input.embeddedGenre = common.genre[0];
+    if (common.bpm) input.bpm = Math.round(common.bpm);
 
     return { block, input };
   } catch {
