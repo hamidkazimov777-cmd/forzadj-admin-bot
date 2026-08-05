@@ -1,4 +1,4 @@
-export const SUPPORTED_AI_PROVIDERS = ["mock", "kimi", "groq", "openrouter"] as const;
+export const SUPPORTED_AI_PROVIDERS = ["mock", "kimi", "groq", "openrouter", "gemini"] as const;
 
 export type AIProviderName = (typeof SUPPORTED_AI_PROVIDERS)[number];
 
