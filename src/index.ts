@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, GrammyError } from "grammy";
 import "dotenv/config";
 import { createAudioHandler } from "./handlers/audio";
 import { registerCallbackHandlers } from "./handlers/callbacks";
@@ -48,5 +48,23 @@ bot.on("message:text", async (ctx) => {
 
 registerCallbackHandlers(bot);
 
-bot.start();
-console.log("Bot started, polling for updates...");
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function startWithRetry() {
+  while (true) {
+    try {
+      console.log("Bot started, polling for updates...");
+      await bot.start();
+      break;
+    } catch (err) {
+      if (err instanceof GrammyError && err.error_code === 409) {
+        console.log("409 Conflict — another instance is shutting down, retrying in 15s...");
+        await sleep(15_000);
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
+startWithRetry();
