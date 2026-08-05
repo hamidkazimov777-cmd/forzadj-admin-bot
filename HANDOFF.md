@@ -104,8 +104,8 @@ Clicking **Artist** or **Title** → bot asks for new value → user sends text 
 # Environment Variables
 
 - `BOT_TOKEN` — Telegram Bot API token
-- `AI_PROVIDER` — `groq` (active) | `kimi` (slow, legacy) | `mock`
-- `GROQ_API_KEY` — Groq API key
+- `AI_PROVIDER` — `groq` | `openrouter` | `gemini` | `cloudflare` | `together` | `kimi` (legacy) | `mock`. Local `.env` currently has `groq`; check the deploy platform's env vars for what's actually live in production — see git log for the provider history (OpenRouter/Gemini were added after this doc was last fully accurate).
+- `GROQ_API_KEY` / `OPENROUTER_API_KEY` / `GEMINI_API_KEY` / `CLOUDFLARE_*` / `TOGETHER_API_KEY` — per-provider keys, only the active one is required
 - `TOKENROUTER_API_KEY` / `TOKENROUTER_BASE_URL` / `TOKENROUTER_MODEL` — legacy Kimi
 - `ALLOWED_TELEGRAM_IDS` — comma-separated whitelisted Telegram user IDs
 - `FORZADJ_API_URL` — site base URL (`http://localhost:3000` locally, `https://forzadj.ru` prod)
@@ -118,7 +118,7 @@ Key facts:
 - Body limit: `experimental.middlewareClientMaxBodySize: 150 * 1024 * 1024` in `next.config.ts`
 - `asset.process` runs synchronously (inline queue) — must complete before branded artwork upload, because `asset.process` calls `softDeleteByVersionAndType("ARTWORK")` internally
 - Branded ARTWORK asset must have `setStatus(id, "READY")` called so `findReadyByVersionAndType` finds it
-- ffmpeg re-encodes audio with branded cover: `-c:a copy -c:v mjpeg -disposition:v attached_pic`
+- ffmpeg re-encode (`embedArtworkIntoAudio`) always runs now, even without artwork, and always sets `-metadata title=… -metadata artist=…` from the (already-cleaned) `meta.title`/`meta.artist` — otherwise ffmpeg copies the original file's raw ID3 tags by default, so the downloaded MP3 kept the un-cleaned title even though the DB/catalog showed the clean one
 
 # Git History (this session — bot repo)
 
@@ -145,16 +145,29 @@ Site repo (`forzadjbeta`) commits:
 Everything is working end-to-end:
 - Track uploads via bot → appears immediately in catalog (auto-published)
 - Branded artwork shows on site (WebP served via `/api/artwork/[versionId]`)
-- Downloaded MP3 contains branded artwork in ID3 tags
+- Downloaded MP3 contains branded artwork AND correctly-cleaned title/artist ID3 tags
 - Artist extracted from filename when ID3 tags are missing
-- Inline editor allows correcting artist/title before publishing
+- Inline editor allows correcting artist/title/genre/mood/version before publishing
+- A failed Publish attempt (network error, site timeout) no longer loses the pending track — data is preserved for retry
+- A single unhandled error in any handler no longer crashes the whole bot process (`bot.catch` in `index.ts`)
+
+## Full audit fixes (2026-08-05)
+
+Root-caused and fixed the intermittent "Nothing to publish. Send an audio file first." report:
+- **Root cause**: `onPublish` (`src/handlers/callbacks.ts`) cleared `pendingStore` *before* calling `publishTrack()`. If the site call failed (network blip, timeout, 5xx), the pending track was already gone — retrying Publish then legitimately found nothing. Fixed by only clearing on confirmed success; failures now reply with the error and a fresh Publish/Edit/Cancel keyboard so the user can retry without re-uploading.
+- **Contributing risk (fixed)**: no `bot.catch()` was registered, so grammy's default handler stopped polling and rethrew on *any* unhandled error from *any* single update (e.g. a Telegram "message is not modified" 400 from double-clicking Cancel, or a >20MB file failing `getFile`), crashing the whole process and wiping `pendingStore` for every chat. Added a global `bot.catch()` that logs and notifies the user without killing the process.
+- **Temp file leaks (fixed)**: Cancel never deleted `pending.filePath`; sending a new track while a previous one was still pending (unpublished/uncancelled) silently orphaned its temp file too. Both paths now clean up.
+- **ID3 tags not cleaned in downloaded MP3 (fixed, site repo)**: `embedArtworkIntoAudio` in `forzadjbeta/src/app/api/bot/upload/route.ts` re-encoded with `-c:a copy`, which by default carries over the *original* (dirty) title/artist ID3 tags — the catalog showed the cleaned title (from `meta.title`) but the downloadable file still had "(Musvisor Intro)" etc. embedded. Fixed by always passing explicit `-metadata title=… -metadata artist=…` and running the retag step unconditionally, not just when branded artwork is present.
+- Verified extensively and found already-correct (no change needed): sequential multi-click safety (grammy processes updates one at a time, so rapid button taps can't race), callback_data never goes stale (pendingStore is keyed by chatId, not message id, so old preview messages' buttons always act on current state), waitingFor state transitions, all edit/back/mood/version callbacks.
+- **Known architectural limitation (not fixed, out of scope)**: `pendingStore` is a pure in-memory `Map` — any process restart/redeploy wipes all pending state for all chats by design. Bot now degrades gracefully (clear "nothing pending" message) rather than crashing, but persisting pending state across restarts would need a deliberate architecture change (e.g. writing to disk/DB), not attempted here.
 
 # Next Steps / Future Roadmap
 
 1. ✅ **Deploy to production** — forzadjbeta запушен, бот переключён на `https://forzadj.ru`, `BOT_UPLOAD_SECRET` добавлен на VPS
-2. **Delete temp files** after successful publication
-3. **Additional editable fields** — genre, mood, version correction before publish (if needed)
+2. ✅ **Delete temp files** after successful publication, cancellation, and when superseded by a new upload
+3. **Additional editable fields** — genre, mood, version correction before publish (already implemented — done)
 4. **Batch upload** — multiple tracks in one session
+5. **Persist pendingStore across restarts** — currently pure in-memory; a redeploy loses in-flight (unpublished) tracks for all chats
 
 # Rules
 

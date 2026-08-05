@@ -9,7 +9,7 @@ export interface AudioMetadataResult {
 const DJ_SERVICE_TAGS =
   /\s*[\(\[][^\)\]]*\b(intro|outro|muzvizor|radio\s*edit|club\s*edit)\b[^\)\]]*[\)\]]|\s*[-–—]+\s*\b(muzvizor\s+)?(intro|outro|muzvizor)\b\s*$/gi;
 
-function cleanTitle(title: string): string {
+export function cleanTitle(title: string): string {
   const cleaned = title.replace(DJ_SERVICE_TAGS, "").trim().replace(/\s+/g, " ");
   return cleaned || title;
 }

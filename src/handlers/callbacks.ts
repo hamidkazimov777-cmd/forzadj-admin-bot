@@ -23,13 +23,16 @@ async function onPublish(ctx: Context): Promise<void> {
     return;
   }
 
-  pendingStore.clear(chatId);
-  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => {});
   await ctx.reply("⏳ Publishing...");
 
   try {
     const result = await publishTrack(pending);
-    // Clean up local temp file after successful publish
+    // Only clear once publication actually succeeded. Clearing beforehand meant a
+    // failed attempt (network error, site timeout, temporary 5xx) permanently lost
+    // the pending track — retrying Publish then hit "Nothing to publish" because the
+    // data was already gone, forcing the user to re-upload and redo any edits.
+    pendingStore.clear(chatId);
     await unlink(pending.filePath).catch(() => {});
     await ctx.reply(
       `✅ Successfully published to ForzaDJ.\n\n` +
@@ -37,14 +40,21 @@ async function onPublish(ctx: Context): Promise<void> {
         `Studio: ${result.studioUrl}`,
     );
   } catch (err) {
+    console.error(`[publish] failed for chat ${chatId}:`, err);
     await ctx.reply(
-      `❌ Publication failed:\n${err instanceof Error ? err.message : String(err)}`,
+      `❌ Publication failed:\n${err instanceof Error ? err.message : String(err)}\n\n` +
+        `Track data preserved — tap ✅ Publish to retry.`,
+      { reply_markup: buildPreviewKeyboard() },
     );
   }
 }
 
 async function onEdit(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
+  const chatId = ctx.chat?.id;
+  if (chatId === undefined) return;
+  const pending = pendingStore.get(chatId);
+  if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
   await ctx.reply("Что редактировать?", { reply_markup: buildEditKeyboard() });
 }
 
@@ -139,8 +149,13 @@ async function onEditBack(ctx: Context): Promise<void> {
 async function onCancel(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
-  if (chatId !== undefined) pendingStore.clear(chatId);
-  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+  if (chatId !== undefined) {
+    const pending = pendingStore.get(chatId);
+    pendingStore.clear(chatId);
+    // Cancelling previously left the downloaded temp file behind forever.
+    if (pending) await unlink(pending.filePath).catch(() => {});
+  }
+  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => {});
   await ctx.reply("Publication cancelled.");
 }
 

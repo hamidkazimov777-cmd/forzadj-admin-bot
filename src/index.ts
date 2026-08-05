@@ -51,6 +51,18 @@ bot.on("message:text", async (ctx) => {
 
 registerCallbackHandlers(bot);
 
+// Without this, grammy's default error handler stops polling and rethrows on
+// ANY unhandled error from a single update (a Telegram API hiccup, a bug in one
+// handler, etc.) — that crashes the whole process and wipes pendingStore for
+// every chat. One bad update must not take down the bot for everyone else.
+bot.catch((err) => {
+  const ctx = err.ctx;
+  console.error(`[bot] Unhandled error on update ${ctx.update.update_id}:`, err.error);
+  ctx.reply("⚠️ Внутренняя ошибка. Попробуйте ещё раз.").catch((replyErr) => {
+    console.error("[bot] Failed to notify user about the error:", replyErr);
+  });
+});
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function startWithRetry() {

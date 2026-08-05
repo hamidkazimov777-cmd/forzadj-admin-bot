@@ -1,6 +1,7 @@
 import { Context } from "grammy";
+import { unlink } from "fs/promises";
 import { downloadTelegramFile } from "../services/telegram-download";
-import { extractAudioMetadata } from "../services/audio-metadata";
+import { extractAudioMetadata, cleanTitle } from "../services/audio-metadata";
 import { analyzeTrack } from "../services/ai/provider";
 import { pendingStore } from "../services/pending";
 import { getArtworkPath } from "../services/artwork";
@@ -8,6 +9,8 @@ import { buildPreviewText, buildPreviewKeyboard } from "./preview";
 import type { AIOutput } from "../services/ai/types";
 
 const AUDIO_EXTENSIONS = [".mp3", ".wav", ".flac", ".aiff"];
+// Telegram Bot API hard limit for file downloads via getFile.
+const MAX_TELEGRAM_FILE_SIZE = 20 * 1024 * 1024;
 
 function isAudioFile(fileName: string | undefined, mimeType: string | undefined): boolean {
   const name = (fileName ?? "").toLowerCase();
@@ -33,7 +36,24 @@ export function createAudioHandler(token: string) {
       return;
     }
 
-    const downloaded = await downloadTelegramFile(token, ctx.api, file);
+    if (file.file_size && file.file_size > MAX_TELEGRAM_FILE_SIZE) {
+      await ctx.reply(
+        `⚠️ File too large (${(file.file_size / 1024 / 1024).toFixed(1)} MB). ` +
+          `Telegram Bot API only allows the bot to download files up to 20 MB.`,
+      );
+      return;
+    }
+
+    let downloaded;
+    try {
+      downloaded = await downloadTelegramFile(token, ctx.api, file);
+    } catch (err) {
+      console.error("[audio] download failed:", err);
+      await ctx.reply(
+        `⚠️ Failed to download the file from Telegram: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return;
+    }
     if (!downloaded) {
       await ctx.reply("⚠️ Failed to download the file from Telegram.");
       return;
@@ -47,7 +67,7 @@ export function createAudioHandler(token: string) {
       metadataInput.artist = file.performer;
     }
     if (!metadataInput.title && file.title) {
-      metadataInput.title = file.title;
+      metadataInput.title = cleanTitle(file.title);
     }
 
     let aiResult: AIOutput | null = null;
@@ -61,6 +81,12 @@ export function createAudioHandler(token: string) {
 
     const chatId = ctx.chat?.id;
     if (chatId !== undefined) {
+      // Sending a new track abandons any unpublished pending one — clean up
+      // its temp file instead of leaking it on disk indefinitely.
+      const previous = pendingStore.get(chatId);
+      if (previous && previous.filePath !== downloaded.savePath) {
+        await unlink(previous.filePath).catch(() => {});
+      }
       const pub = {
         filePath: downloaded.savePath,
         fileName: downloaded.saveName,
