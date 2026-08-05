@@ -151,7 +151,7 @@ Everything is working end-to-end:
 
 # Next Steps / Future Roadmap
 
-1. **Deploy to production** — when ready: push forzadjbeta to GitHub → CI deploys; update bot `.env` `FORZADJ_API_URL=https://forzadj.ru`
+1. ✅ **Deploy to production** — forzadjbeta запушен, бот переключён на `https://forzadj.ru`, `BOT_UPLOAD_SECRET` добавлен на VPS
 2. **Delete temp files** after successful publication
 3. **Additional editable fields** — genre, mood, version correction before publish (if needed)
 4. **Batch upload** — multiple tracks in one session
