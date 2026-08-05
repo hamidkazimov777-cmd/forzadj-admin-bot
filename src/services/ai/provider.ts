@@ -3,6 +3,7 @@ import { analyzeWithKimi } from "./providers/kimi";
 import { analyzeWithGroq } from "./providers/groq";
 import { analyzeWithOpenRouter } from "./providers/openrouter";
 import { analyzeWithGemini } from "./providers/gemini";
+import { analyzeWithCloudflare } from "./providers/cloudflare";
 import type { AIInput, AIOutput } from "./types";
 
 // Mock provider: no external calls, returns fixed values.
@@ -29,5 +30,7 @@ export async function analyzeTrack(input: AIInput): Promise<AIOutput> {
       return analyzeWithOpenRouter(input);
     case "gemini":
       return analyzeWithGemini(input);
+    case "cloudflare":
+      return analyzeWithCloudflare(input);
   }
 }
