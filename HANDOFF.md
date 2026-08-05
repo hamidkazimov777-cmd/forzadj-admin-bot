@@ -104,7 +104,7 @@ Clicking **Artist** or **Title** → bot asks for new value → user sends text 
 # Environment Variables
 
 - `BOT_TOKEN` — Telegram Bot API token
-- `AI_PROVIDER` — `groq` | `openrouter` | `gemini` | `cloudflare` | `together` | `kimi` (legacy) | `mock`. Local `.env` currently has `groq`; check the deploy platform's env vars for what's actually live in production — see git log for the provider history (OpenRouter/Gemini were added after this doc was last fully accurate).
+- `AI_PROVIDER` — `groq` | `openrouter` | `gemini` | `cloudflare` | `together` | `kimi` (legacy) | `mock`. Current active provider: **`gemini`** (`gemini-2.5-flash`). Set `AI_PROVIDER=gemini` and `GEMINI_API_KEY` in the deploy platform's env vars.
 - `GROQ_API_KEY` / `OPENROUTER_API_KEY` / `GEMINI_API_KEY` / `CLOUDFLARE_*` / `TOGETHER_API_KEY` — per-provider keys, only the active one is required
 - `TOKENROUTER_API_KEY` / `TOKENROUTER_BASE_URL` / `TOKENROUTER_MODEL` — legacy Kimi
 - `ALLOWED_TELEGRAM_IDS` — comma-separated whitelisted Telegram user IDs
@@ -120,25 +120,22 @@ Key facts:
 - Branded ARTWORK asset must have `setStatus(id, "READY")` called so `findReadyByVersionAndType` finds it
 - ffmpeg re-encode (`embedArtworkIntoAudio`) always runs now, even without artwork, and always sets `-metadata title=… -metadata artist=…` from the (already-cleaned) `meta.title`/`meta.artist` — otherwise ffmpeg copies the original file's raw ID3 tags by default, so the downloaded MP3 kept the un-cleaned title even though the DB/catalog showed the clean one
 
-# Git History (this session — bot repo)
-
-All commits are local, not pushed to GitHub.
+# Git History
 
 | Commit | Message |
 |--------|---------|
-| `5e00f36` | Map AI energy to Studio |
-| `8cXXXXX` | Fix AI speed: switch to Groq |
-| `438e179` | Add branded artwork per genre |
-| `bd52402` | Improve AI classification prompt |
-| `1f1652e` | Parse artist and title from filename when ID3 tags are empty |
-| `418ba92` | Fix artist extraction when ID3 has title but no artist tag |
-| `772e7c8` | Add inline track editor and fix artist from Telegram audio metadata |
+| `a9c28e1` | Switch Gemini provider to gemini-2.5-flash |
+| `ce0f23d` | Force fresh connections for site publish requests to fix intermittent JSON parse crash |
+| `38b6ab0` | Fix premature pendingStore clear, add global error handler, plug temp-file leaks |
+| `dce8970` | Clean DJ service tags from titles, strip extra metadata on upload |
 
-Site repo (`forzadjbeta`) commits:
+Site repo (`forzadjbeta`) recent relevant commits:
 | Commit | Message |
 |--------|---------|
-| `2874c5c` | Auto-publish bot-uploaded tracks to catalog |
+| `cac69f8` | Fix silent failures in Telegram bot login flow |
+| `54220f9` | Always rewrite title/artist ID3 tags when re-encoding bot uploads |
 | `ec3bca4` | Embed branded artwork into audio file at upload time |
+| `2874c5c` | Auto-publish bot-uploaded tracks to catalog |
 
 # Current State (2026-08-05)
 
