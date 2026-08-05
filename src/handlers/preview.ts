@@ -6,10 +6,13 @@ function ratingStars(n: number): string {
   return "★".repeat(filled) + "☆".repeat(5 - filled);
 }
 
-export function buildPreviewText(pub: PendingPublication): string {
+export function buildPreviewText(pub: PendingPublication, pos?: number, total?: number): string {
   const ai = pub.aiResult;
   const artist = pub.metadataInput.artist ?? "—";
   const title = pub.metadataInput.title ?? "—";
+  const queueLabel = pos !== undefined && total !== undefined && total > 1
+    ? ` (${pos}/${total})`
+    : "";
 
   const aiSection = ai
     ? "🤖 AI Analysis\n\n" +
@@ -21,7 +24,7 @@ export function buildPreviewText(pub: PendingPublication): string {
     : "🤖 AI Analysis\n\n⚠️ Analysis failed.";
 
   return (
-    "📀 Track\n\n" +
+    `📀 Track${queueLabel}\n\n` +
     `Artist:  ${artist}\n` +
     `Title:   ${title}\n\n` +
     aiSection +
@@ -31,12 +34,17 @@ export function buildPreviewText(pub: PendingPublication): string {
   );
 }
 
-export function buildPreviewKeyboard(): InlineKeyboard {
-  return new InlineKeyboard()
+export function buildPreviewKeyboard(queueSize = 1): InlineKeyboard {
+  const kb = new InlineKeyboard()
     .text("✅ Publish", "publish")
     .text("✏️ Edit", "edit")
-    .row()
-    .text("❌ Cancel", "cancel");
+    .row();
+  if (queueSize > 1) {
+    kb.text("⏭ Skip", "cancel").text(`🗑 Cancel All (${queueSize})`, "cancel_all");
+  } else {
+    kb.text("❌ Cancel", "cancel");
+  }
+  return kb;
 }
 
 export function buildEditKeyboard(): InlineKeyboard {

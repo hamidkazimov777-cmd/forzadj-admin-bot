@@ -1,5 +1,4 @@
 import { Context } from "grammy";
-import { unlink } from "fs/promises";
 import { downloadTelegramFile } from "../services/telegram-download";
 import { extractAudioMetadata, cleanTitle } from "../services/audio-metadata";
 import { analyzeTrack } from "../services/ai/provider";
@@ -26,7 +25,6 @@ export function createAudioHandler(token: string) {
       file_size?: number;
       file_name?: string;
       mime_type?: string;
-      // Telegram extracts these from audio files automatically
       performer?: string;
       title?: string;
     }
@@ -61,8 +59,6 @@ export function createAudioHandler(token: string) {
 
     const { input: metadataInput } = await extractAudioMetadata(downloaded.savePath, file.file_name);
 
-    // Telegram extracts performer/title from the audio file independently.
-    // Use them as fallback when our ID3 parsing and filename parsing both fail.
     if (!metadataInput.artist && file.performer) {
       metadataInput.artist = file.performer;
     }
@@ -81,12 +77,6 @@ export function createAudioHandler(token: string) {
 
     const chatId = ctx.chat?.id;
     if (chatId !== undefined) {
-      // Sending a new track abandons any unpublished pending one — clean up
-      // its temp file instead of leaking it on disk indefinitely.
-      const previous = pendingStore.get(chatId);
-      if (previous && previous.filePath !== downloaded.savePath) {
-        await unlink(previous.filePath).catch(() => {});
-      }
       const pub = {
         filePath: downloaded.savePath,
         fileName: downloaded.saveName,
@@ -95,8 +85,20 @@ export function createAudioHandler(token: string) {
         aiResult,
         artworkPath,
       };
-      pendingStore.set(chatId, pub);
-      await ctx.reply(buildPreviewText(pub), { reply_markup: buildPreviewKeyboard() });
+      const queueSize = pendingStore.push(chatId, pub);
+
+      if (queueSize === 1) {
+        // First in queue — show preview immediately.
+        await ctx.reply(buildPreviewText(pub, 1, 1), { reply_markup: buildPreviewKeyboard(1) });
+      } else {
+        // Already reviewing another track — let user know it's queued.
+        const artist = metadataInput.artist ?? "—";
+        const title = metadataInput.title ?? "—";
+        await ctx.reply(
+          `🎵 ${artist} — ${title}\n` +
+          `Добавлен в очередь (#${queueSize}). Опубликуй текущий трек, затем появится следующий.`
+        );
+      }
     }
   };
 }

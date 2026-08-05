@@ -11,13 +11,21 @@ import {
   buildVersionKeyboard,
 } from "./preview";
 
+async function showNext(ctx: Context, chatId: number): Promise<void> {
+  const next = pendingStore.peek(chatId);
+  if (next) {
+    const size = pendingStore.size(chatId);
+    await ctx.reply(buildPreviewText(next, 1, size), { reply_markup: buildPreviewKeyboard(size) });
+  }
+}
+
 async function onPublish(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
 
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
 
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending) {
     await ctx.reply("⚠️ Nothing to publish. Send an audio file first.");
     return;
@@ -28,23 +36,23 @@ async function onPublish(ctx: Context): Promise<void> {
 
   try {
     const result = await publishTrack(pending);
-    // Only clear once publication actually succeeded. Clearing beforehand meant a
-    // failed attempt (network error, site timeout, temporary 5xx) permanently lost
-    // the pending track — retrying Publish then hit "Nothing to publish" because the
-    // data was already gone, forcing the user to re-upload and redo any edits.
-    pendingStore.clear(chatId);
+    pendingStore.advance(chatId);
     await unlink(pending.filePath).catch(() => {});
+    const queueSize = pendingStore.size(chatId);
     await ctx.reply(
       `✅ Successfully published to ForzaDJ.\n\n` +
         `Track ID: ${result.trackId}\n` +
-        `Studio: ${result.studioUrl}`,
+        `Studio: ${result.studioUrl}` +
+        (queueSize > 0 ? `\n\n📋 Следующий трек (${queueSize} в очереди):` : ""),
     );
+    await showNext(ctx, chatId);
   } catch (err) {
     console.error(`[publish] failed for chat ${chatId}:`, err);
+    const size = pendingStore.size(chatId);
     await ctx.reply(
       `❌ Publication failed:\n${err instanceof Error ? err.message : String(err)}\n\n` +
         `Track data preserved — tap ✅ Publish to retry.`,
-      { reply_markup: buildPreviewKeyboard() },
+      { reply_markup: buildPreviewKeyboard(size) },
     );
   }
 }
@@ -53,7 +61,7 @@ async function onEdit(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
   await ctx.reply("Что редактировать?", { reply_markup: buildEditKeyboard() });
 }
@@ -62,7 +70,7 @@ async function onEditArtist(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
   pending.waitingFor = "artist";
   await ctx.reply(`Текущий артист: ${pending.metadataInput.artist ?? "—"}\n\nОтправь новое имя:`);
@@ -72,7 +80,7 @@ async function onEditTitle(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
   pending.waitingFor = "title";
   await ctx.reply(`Текущее название: ${pending.metadataInput.title ?? "—"}\n\nОтправь новое название:`);
@@ -82,7 +90,7 @@ async function onEditGenre(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
   pending.waitingFor = "genre";
   const current = pending.aiResult?.genre ?? "—";
@@ -100,7 +108,7 @@ async function onEditMood(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
   const current = pending.aiResult?.mood ?? "—";
   await ctx.reply(`Текущее настроение: ${current}\n\nВыбери:`, { reply_markup: buildMoodKeyboard() });
@@ -110,7 +118,7 @@ async function onEditVersion(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
   const current = pending.aiResult?.version ?? "—";
   await ctx.reply(`Текущая версия: ${current}\n\nВыбери:`, { reply_markup: buildVersionKeyboard() });
@@ -120,43 +128,61 @@ async function onSetMood(ctx: Context, mood: string): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending || !pending.aiResult) { await ctx.reply("⚠️ Нет активного трека."); return; }
   pending.aiResult.mood = mood;
-  await ctx.reply(buildPreviewText(pending), { reply_markup: buildPreviewKeyboard() });
+  const size = pendingStore.size(chatId);
+  await ctx.reply(buildPreviewText(pending, 1, size), { reply_markup: buildPreviewKeyboard(size) });
 }
 
 async function onSetVersion(ctx: Context, version: string): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending || !pending.aiResult) { await ctx.reply("⚠️ Нет активного трека."); return; }
   pending.aiResult.version = version;
-  await ctx.reply(buildPreviewText(pending), { reply_markup: buildPreviewKeyboard() });
+  const size = pendingStore.size(chatId);
+  await ctx.reply(buildPreviewText(pending, 1, size), { reply_markup: buildPreviewKeyboard(size) });
 }
 
 async function onEditBack(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
   pending.waitingFor = undefined;
-  await ctx.reply(buildPreviewText(pending), { reply_markup: buildPreviewKeyboard() });
+  const size = pendingStore.size(chatId);
+  await ctx.reply(buildPreviewText(pending, 1, size), { reply_markup: buildPreviewKeyboard(size) });
 }
 
 async function onCancel(ctx: Context): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
-  if (chatId !== undefined) {
-    const pending = pendingStore.get(chatId);
-    pendingStore.clear(chatId);
-    // Cancelling previously left the downloaded temp file behind forever.
-    if (pending) await unlink(pending.filePath).catch(() => {});
-  }
+  if (chatId === undefined) return;
+  const current = pendingStore.peek(chatId);
+  pendingStore.advance(chatId);
+  if (current) await unlink(current.filePath).catch(() => {});
   await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => {});
-  await ctx.reply("Publication cancelled.");
+
+  const queueSize = pendingStore.size(chatId);
+  if (queueSize > 0) {
+    await ctx.reply(`⏭ Пропущен. Следующий трек (${queueSize} в очереди):`);
+    await showNext(ctx, chatId);
+  } else {
+    await ctx.reply("Publication cancelled.");
+  }
+}
+
+async function onCancelAll(ctx: Context): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const chatId = ctx.chat?.id;
+  if (chatId === undefined) return;
+  const all = pendingStore.clearAll(chatId);
+  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => {});
+  for (const pub of all) await unlink(pub.filePath).catch(() => {});
+  await ctx.reply(`🗑 Отменено ${all.length} ${all.length === 1 ? "трек" : all.length < 5 ? "трека" : "треков"}.`);
 }
 
 export function registerCallbackHandlers(bot: Bot): void {
@@ -169,12 +195,11 @@ export function registerCallbackHandlers(bot: Bot): void {
   bot.callbackQuery("edit_version", onEditVersion);
   bot.callbackQuery("edit_back", onEditBack);
   bot.callbackQuery("cancel", onCancel);
+  bot.callbackQuery("cancel_all", onCancelAll);
 
-  // Mood selection buttons
   for (const mood of ["Warm Up", "Prime Time", "After Party"]) {
     bot.callbackQuery(`set_mood_${mood}`, (ctx) => onSetMood(ctx, mood));
   }
-  // Version selection buttons
   for (const version of ["Original", "Extended", "Remix", "Mashup"]) {
     bot.callbackQuery(`set_version_${version}`, (ctx) => onSetVersion(ctx, version));
   }

@@ -31,7 +31,7 @@ bot.on("message:document", (ctx) => handleAudio(ctx, ctx.message.document));
 bot.on("message:text", async (ctx) => {
   const chatId = ctx.chat?.id;
   if (!chatId) return;
-  const pending = pendingStore.get(chatId);
+  const pending = pendingStore.peek(chatId);
   if (!pending?.waitingFor) return;
 
   const field = pending.waitingFor;
@@ -46,7 +46,8 @@ bot.on("message:text", async (ctx) => {
     pending.artworkPath = await getArtworkPath(pending.aiResult.genre);
   }
 
-  await ctx.reply(buildPreviewText(pending), { reply_markup: buildPreviewKeyboard() });
+  const size = pendingStore.size(chatId);
+  await ctx.reply(buildPreviewText(pending, 1, size), { reply_markup: buildPreviewKeyboard(size) });
 });
 
 registerCallbackHandlers(bot);
