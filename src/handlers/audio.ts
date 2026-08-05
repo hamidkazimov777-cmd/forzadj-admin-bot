@@ -55,8 +55,8 @@ export function createAudioHandler(token: string) {
     try {
       aiResult = await analyzeTrack(metadataInput);
       artworkPath = await getArtworkPath(aiResult.genre);
-    } catch {
-      // aiResult stays null; preview still shown with edit/publish options
+    } catch (err) {
+      console.error("[AI] analysis failed:", err);
     }
 
     const chatId = ctx.chat?.id;
