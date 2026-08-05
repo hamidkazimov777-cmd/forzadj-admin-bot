@@ -81,17 +81,27 @@ export async function extractAudioMetadata(
 
     // Fall back to filename parsing when ID3 artist tag is missing.
     // Many DJ tracks have an ID3 title but no artist — so check artist only.
-    const fallback =
-      !common.artist && originalFileName
-        ? parseArtistTitle(originalFileName)
-        : {};
+    // When originalFileName is absent (e.g. audio messages without file_name),
+    // also try common.title as a filename-like source if it looks like one
+    // (contains underscores, no spaces — typical Beatport/Traxsource embed style).
+    const filenameSource =
+      !common.artist
+        ? originalFileName ??
+          (common.title?.includes("_") && !common.title.includes(" ")
+            ? common.title
+            : undefined)
+        : undefined;
+    const fallback = filenameSource ? parseArtistTitle(filenameSource) : {};
     const artist = common.artist || fallback.artist;
     // When artist came from filename, the ID3 title often contains the full
     // "Artist - Title" string (same as the filename). Prefer the filename-parsed
     // title in that case to avoid the artist name appearing inside the title.
+    // Also normalize underscores in common.title regardless (some tools embed the
+    // raw filename as the title tag).
+    const rawTitle = common.title?.replace(/_/g, " ").replace(/\s+/g, " ").trim();
     const title = fallback.artist
-      ? (fallback.title || common.title)
-      : (common.title || fallback.title);
+      ? (fallback.title || rawTitle)
+      : (rawTitle || fallback.title);
 
     const block =
       "📋 Metadata\n\n" +
