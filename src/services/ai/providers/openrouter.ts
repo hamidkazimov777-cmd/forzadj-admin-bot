@@ -40,7 +40,8 @@ export async function analyzeWithOpenRouter(input: AIInput): Promise<AIOutput> {
   }
 
   if (!res.ok) {
-    throw new Error(`OpenRouter request failed: HTTP ${res.status}`);
+    const body = await res.text().catch(() => "");
+    throw new Error(`OpenRouter request failed: HTTP ${res.status} — ${body}`);
   }
 
   const data = (await res.json()) as {
