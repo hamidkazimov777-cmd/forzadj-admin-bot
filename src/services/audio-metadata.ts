@@ -68,6 +68,10 @@ export async function extractAudioMetadata(
   try {
     const meta = await parseFile(filePath);
     const { common, format } = meta;
+    // TEMP DIAGNOSTICS
+    console.log(`[metadata] common.artist: ${typeof common.artist} | ${JSON.stringify(common.artist)}`);
+    console.log(`[metadata] common.title: ${typeof common.title} | ${JSON.stringify(common.title)}`);
+    console.log(`[metadata] originalFileName: ${typeof originalFileName} | ${JSON.stringify(originalFileName)}`);
     const fmt = (v: unknown) =>
       v === undefined || v === null || v === "" ? "n/a" : String(v);
     const seconds =
@@ -92,6 +96,7 @@ export async function extractAudioMetadata(
             : undefined)
         : undefined;
     const fallback = filenameSource ? parseArtistTitle(filenameSource) : {};
+    console.log(`[metadata] filenameSource: ${typeof filenameSource} | ${JSON.stringify(filenameSource)}`);
     const artist = common.artist || fallback.artist;
     // When artist came from filename, the ID3 title often contains the full
     // "Artist - Title" string (same as the filename). Prefer the filename-parsed
