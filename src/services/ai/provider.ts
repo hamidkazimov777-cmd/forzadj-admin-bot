@@ -4,6 +4,7 @@ import { analyzeWithGroq } from "./providers/groq";
 import { analyzeWithOpenRouter } from "./providers/openrouter";
 import { analyzeWithGemini } from "./providers/gemini";
 import { analyzeWithCloudflare } from "./providers/cloudflare";
+import { analyzeWithTogether } from "./providers/together";
 import type { AIInput, AIOutput } from "./types";
 
 // Mock provider: no external calls, returns fixed values.
@@ -32,5 +33,7 @@ export async function analyzeTrack(input: AIInput): Promise<AIOutput> {
       return analyzeWithGemini(input);
     case "cloudflare":
       return analyzeWithCloudflare(input);
+    case "together":
+      return analyzeWithTogether(input);
   }
 }
