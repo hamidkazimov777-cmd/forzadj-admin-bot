@@ -124,7 +124,7 @@ Key facts:
 
 | Commit | Message |
 |--------|---------|
-| `<next>` | Improve AI classification: BPM context, rewrite prompt for better genre/mood/version/rating |
+| `74ac774` | Improve AI classification: BPM context, rewrite prompt for genre/mood/version/rating |
 | `a9c28e1` | Switch Gemini provider to gemini-2.5-flash |
 | `ce0f23d` | Force fresh connections for site publish requests to fix intermittent JSON parse crash |
 | `38b6ab0` | Fix premature pendingStore clear, add global error handler, plug temp-file leaks |
