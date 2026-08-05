@@ -19,7 +19,7 @@ export async function analyzeWithOpenRouter(input: AIInput): Promise<AIOutput> {
         "X-Title": "ForzaDJ Bot",
       },
       body: JSON.stringify({
-        model: "google/gemini-flash-1.5",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
