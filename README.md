@@ -180,7 +180,7 @@ Long-polling means the bot needs no inbound networking configuration — it only
 
 **Hamid Kazimov**
 
-[![Telegram](https://img.shields.io/badge/Telegram-@hamidkazimov-2CA5E0?style=flat-square&logo=telegram&logoColor=white)](https://t.me/hamidkazimov)
+[![Telegram](https://img.shields.io/badge/Telegram-@hamidkazim-2CA5E0?style=flat-square&logo=telegram&logoColor=white)](https://t.me/hamidkazim)
 [![GitHub](https://img.shields.io/badge/GitHub-hamidkazimov777--cmd-181717?style=flat-square&logo=github)](https://github.com/hamidkazimov777-cmd)
 
 ---
