@@ -41,7 +41,12 @@ export async function extractAudioMetadata(
         ? parseArtistTitle(originalFileName)
         : {};
     const artist = common.artist || fallback.artist;
-    const title = common.title || fallback.title;
+    // When artist came from filename, the ID3 title often contains the full
+    // "Artist - Title" string (same as the filename). Prefer the filename-parsed
+    // title in that case to avoid the artist name appearing inside the title.
+    const title = fallback.artist
+      ? (fallback.title || common.title)
+      : (common.title || fallback.title);
 
     const block =
       "📋 Metadata\n\n" +
