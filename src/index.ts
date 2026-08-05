@@ -14,6 +14,9 @@ if (!token) {
   process.exit(1);
 }
 
+console.log(`AI_PROVIDER=${process.env.AI_PROVIDER ?? "not set"}`);
+console.log(`OPENROUTER_API_KEY=${process.env.OPENROUTER_API_KEY ? "set (" + process.env.OPENROUTER_API_KEY.slice(0, 8) + "...)" : "NOT SET"}`);
+
 const bot = new Bot(token);
 
 bot.use(authMiddleware);
