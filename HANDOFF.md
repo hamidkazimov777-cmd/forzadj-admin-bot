@@ -26,17 +26,17 @@ src/
 │   └── preview.ts                    # buildPreviewText(), buildPreviewKeyboard(), buildEditKeyboard()
 ├── services/
 │   ├── telegram-download.ts          # Downloads from Telegram, saves to temp/YYYY-MM-DD/
-│   ├── audio-metadata.ts             # extractAudioMetadata(): ID3 parse → filename fallback → AIInput
-│   ├── pending.ts                    # pendingStore: Map<chatId, PendingPublication> incl. waitingFor field
+│   ├── audio-metadata.ts             # extractAudioMetadata(): ID3 parse → filename fallback → AIInput; cleanTitle(); parseArtistTitle()
+│   ├── pending.ts                    # pendingStore: Map<chatId, PendingPublication[]> queue; push/peek/size/advance/clearAll
 │   ├── forzadj-api.ts                # publishTrack(): multipart POST to /api/bot/upload
 │   ├── artwork.ts                    # getArtworkPath(genre): genre → assets/artwork/*.png
 │   └── ai/
-│       ├── types.ts                  # AIInput / AIOutput
+│       ├── types.ts                  # AIInput / AIOutput; AIInput includes bpm?: number
 │       ├── provider.ts               # analyzeTrack(): dispatches by AI_PROVIDER
 │       └── providers/
 │           ├── groq.ts               # analyzeWithGroq(): Groq llama-3.3-70b-versatile, 1–3s, 30s timeout
 │           ├── kimi.ts               # analyzeWithKimi(): TokenRouter (legacy, slow)
-│           └── prompt.ts             # buildPrompt(input): shared prompt for all providers
+│           └── prompt.ts             # buildPrompt(input): shared prompt; BPM context, DJ-context MOOD, rating = club potential
 
 assets/artwork/                       # 13 branded PNG covers (one per genre):
   afro-house.png, baile-funk.png, bass-house.png, breaks.png, edm.png,
@@ -84,6 +84,8 @@ On Publish:
 
 # Inline Editing Flow
 
+**pendingStore is a QUEUE** (`Map<number, PendingPublication[]>`). When multiple tracks are sent, each is analyzed in sequence and pushed into the queue. The preview shows `(1/N)`. After publish or skip, `advance()` is called and the next track's preview is shown automatically. "🗑 Cancel All (N)" clears the entire queue.
+
 After AI preview, user sees:
 ```
 📀 Track
@@ -124,6 +126,13 @@ Key facts:
 
 | Commit | Message |
 |--------|---------|
+| `f1703eb` | Fix Prisma error: remove releaseDate from Track update (site repo) |
+| `0f37f9f` | Fix bot-uploaded tracks never appearing on /new (site repo) |
+| `f27c4e8` | Add dirty/clean to DJ service tags regex (site repo) |
+| `d80a2d0` | Store clean download filename for bot uploads (site repo) |
+| `5651531` | Normalize title in bot upload: strip underscores and service tags server-side (site repo) |
+| `ebe2d7c` | Add dirty/clean to DJ service tags regex (bot) |
+| `59b653a` | Fix metadata normalization: underscores, service-tag cleaning, smart artist split (bot) |
 | `74ac774` | Improve AI classification: BPM context, rewrite prompt for genre/mood/version/rating |
 | `a9c28e1` | Switch Gemini provider to gemini-2.5-flash |
 | `ce0f23d` | Force fresh connections for site publish requests to fix intermittent JSON parse crash |
@@ -138,7 +147,7 @@ Site repo (`forzadjbeta`) recent relevant commits:
 | `ec3bca4` | Embed branded artwork into audio file at upload time |
 | `2874c5c` | Auto-publish bot-uploaded tracks to catalog |
 
-# Current State (2026-08-05)
+# Current State (2026-08-06)
 
 Everything is working end-to-end:
 - Track uploads via bot → appears immediately in catalog (auto-published)
@@ -148,6 +157,10 @@ Everything is working end-to-end:
 - Inline editor allows correcting artist/title/genre/mood/version before publishing
 - A failed Publish attempt (network error, site timeout) no longer loses the pending track — data is preserved for retry
 - A single unhandled error in any handler no longer crashes the whole bot process (`bot.catch` in `index.ts`)
+- **Batch upload**: send multiple tracks — each is analyzed and queued. Publish/skip one at a time, cancel the whole queue if needed.
+- **Metadata normalization**: underscores → spaces, DJ service tags (Intro/Outro/Muzvizor/Dirty/Clean) stripped in both bot and site. Clean download filename stored in DB from the start.
+- **AI classification improvements**: BPM from ID3 tags sent to Gemini. Rewritten prompt for better genre/mood/version/rating. Rating = club potential (not production quality).
+- **Prisma releaseDate fix**: `releaseDate` lives on `TrackVersion`, not `Track` — removed erroneous `releaseDate` from `trackRepository.update()` call that caused "Unknown argument" error on every publish.
 
 ## Full audit fixes (2026-08-05)
 
@@ -171,9 +184,11 @@ Real testing after round 1 found the JSON-parse crash still occurred on the *fir
 
 1. ✅ **Deploy to production** — forzadjbeta запушен, бот переключён на `https://forzadj.ru`, `BOT_UPLOAD_SECRET` добавлен на VPS
 2. ✅ **Delete temp files** after successful publication, cancellation, and when superseded by a new upload
-3. **Additional editable fields** — genre, mood, version correction before publish (already implemented — done)
-4. **Batch upload** — multiple tracks in one session
-5. **Persist pendingStore across restarts** — currently pure in-memory; a redeploy loses in-flight (unpublished) tracks for all chats
+3. ✅ **Additional editable fields** — genre, mood, version correction before publish
+4. ✅ **Batch upload** — multiple tracks in one session (queue-based)
+5. ✅ **Metadata normalization** — underscores, service tags, clean download filenames
+6. ✅ **AI improvements** — BPM context, rewritten prompt, Gemini 2.5 Flash
+7. **Persist pendingStore across restarts** — currently pure in-memory; a redeploy loses in-flight (unpublished) tracks for all chats
 
 # Rules
 
@@ -183,4 +198,4 @@ Real testing after round 1 found the JSON-parse crash still occurred on the *fir
 - Update HANDOFF.md after every completed step, BEFORE the Git commit.
 - Never expose secrets; never commit `.env`.
 - Do not modify unrelated code.
-- No git push — everything stays local until explicitly told otherwise.
+- Always `git push` immediately after every `git commit` (Railway won't see local changes).
