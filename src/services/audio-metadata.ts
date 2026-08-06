@@ -10,7 +10,7 @@ export interface AudioMetadataResult {
 // These are missed when the file uses underscores instead of spaces, because the
 // underscore (\w) blocks \b word boundaries — fixed by normalizing before matching.
 const DJ_SERVICE_TAGS =
-  /\s*[\(\[][^\)\]]*\b(intro|outro|muzvizor|radio\s*edit|club\s*edit)\b[^\)\]]*[\)\]]|\s*[-–—]+\s*\b(muzvizor\s+)?(intro|outro|muzvizor)\b\s*$|\s+\b(muzvizor(?:\s+(?:intro|outro))?|intro|outro)\b\s*$/gi;
+  /\s*[\(\[][^\)\]]*\b(intro|outro|muzvizor|radio\s*edit|club\s*edit|dirty|clean)\b[^\)\]]*[\)\]]|\s*[-–—]+\s*\b(muzvizor\s+)?(intro|outro|muzvizor|dirty|clean)\b\s*$|\s+\b(muzvizor(?:\s+(?:intro|outro))?|intro|outro|dirty|clean)\b\s*$/gi;
 
 export function cleanTitle(title: string): string {
   // Run twice: first pass may uncover a second tag once the outer one is stripped
