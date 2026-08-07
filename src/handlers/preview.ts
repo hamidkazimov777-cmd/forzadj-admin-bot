@@ -56,8 +56,17 @@ export function buildEditKeyboard(): InlineKeyboard {
     .text("🌙 Mood", "edit_mood")
     .row()
     .text("🔀 Version", "edit_version")
+    .text("⭐ Rating", "edit_rating")
     .row()
     .text("« Back", "edit_back");
+}
+
+export function buildRatingKeyboard(): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (let n = 1; n <= 5; n++) {
+    kb.text(`${"★".repeat(n)} ${n}`, `set_rating_${n}`).row();
+  }
+  return kb.text("« Back", "edit_back");
 }
 
 export function buildMoodKeyboard(): InlineKeyboard {

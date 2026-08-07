@@ -9,6 +9,7 @@ import {
   buildEditKeyboard,
   buildMoodKeyboard,
   buildVersionKeyboard,
+  buildRatingKeyboard,
 } from "./preview";
 
 async function showNext(ctx: Context, chatId: number): Promise<void> {
@@ -124,6 +125,27 @@ async function onEditVersion(ctx: Context): Promise<void> {
   await ctx.reply(`Текущая версия: ${current}\n\nВыбери:`, { reply_markup: buildVersionKeyboard() });
 }
 
+async function onEditRating(ctx: Context): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const chatId = ctx.chat?.id;
+  if (chatId === undefined) return;
+  const pending = pendingStore.peek(chatId);
+  if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
+  const current = pending.aiResult?.rating ?? "—";
+  await ctx.reply(`Текущий рейтинг: ${current}/5\n\nВыбери:`, { reply_markup: buildRatingKeyboard() });
+}
+
+async function onSetRating(ctx: Context, rating: number): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const chatId = ctx.chat?.id;
+  if (chatId === undefined) return;
+  const pending = pendingStore.peek(chatId);
+  if (!pending || !pending.aiResult) { await ctx.reply("⚠️ Нет активного трека."); return; }
+  pending.aiResult.rating = rating;
+  const size = pendingStore.size(chatId);
+  await ctx.reply(buildPreviewText(pending, 1, size), { reply_markup: buildPreviewKeyboard(size) });
+}
+
 async function onSetMood(ctx: Context, mood: string): Promise<void> {
   await ctx.answerCallbackQuery();
   const chatId = ctx.chat?.id;
@@ -193,6 +215,7 @@ export function registerCallbackHandlers(bot: Bot): void {
   bot.callbackQuery("edit_genre", onEditGenre);
   bot.callbackQuery("edit_mood", onEditMood);
   bot.callbackQuery("edit_version", onEditVersion);
+  bot.callbackQuery("edit_rating", onEditRating);
   bot.callbackQuery("edit_back", onEditBack);
   bot.callbackQuery("cancel", onCancel);
   bot.callbackQuery("cancel_all", onCancelAll);
@@ -202,5 +225,8 @@ export function registerCallbackHandlers(bot: Bot): void {
   }
   for (const version of ["Original", "Extended", "Remix", "Mashup"]) {
     bot.callbackQuery(`set_version_${version}`, (ctx) => onSetVersion(ctx, version));
+  }
+  for (let rating = 1; rating <= 5; rating++) {
+    bot.callbackQuery(`set_rating_${rating}`, (ctx) => onSetRating(ctx, rating));
   }
 }
