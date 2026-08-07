@@ -4,6 +4,9 @@
 
 **Telegram bot that turns "send an MP3" into a fully published catalog entry — in one message**
 
+🌐 **Live site:** [forzadj.ru](https://forzadj.ru)
+
+[![Website](https://img.shields.io/badge/Live-forzadj.ru-6E56CF?style=flat-square&logo=googlechrome&logoColor=white)](https://forzadj.ru)
 [![grammY](https://img.shields.io/badge/grammY-1.30-26A5E4?style=flat-square&logo=telegram&logoColor=white)](https://grammy.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
