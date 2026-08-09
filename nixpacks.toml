@@ -1,0 +1,5 @@
+[providers.node]
+nodeVersion = "20"
+
+[phases.setup]
+aptPkgs = ["...", "ffmpeg"]
