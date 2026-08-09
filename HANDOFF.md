@@ -202,3 +202,6 @@ Real testing after round 1 found the JSON-parse crash still occurred on the *fir
 - Never expose secrets; never commit `.env`.
 - Do not modify unrelated code.
 - Always `git push` immediately after every `git commit` (Railway won't see local changes).
+
+## Deployment fixes (2026-08-09)
+- **Railway Build Fix**: Railway deployment failed because it couldn't find `ffmpeg`. Adding a custom `nixpacks.toml` with `aptPkgs = ["ffmpeg"]` and correcting the `providers = ["node"]` syntax resolved the build errors and ensured the bot container starts successfully with native `ffmpeg` installed.
