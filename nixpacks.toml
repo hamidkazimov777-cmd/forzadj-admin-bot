@@ -4,4 +4,4 @@ providers = ["node"]
 NIXPACKS_NODE_VERSION = "20"
 
 [phases.setup]
-aptPkgs = ["ffmpeg"]
+nixPkgs = ["...", "ffmpeg"]
