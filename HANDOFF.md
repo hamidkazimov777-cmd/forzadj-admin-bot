@@ -205,3 +205,9 @@ Real testing after round 1 found the JSON-parse crash still occurred on the *fir
 
 ## Deployment fixes (2026-08-09)
 - **Railway Build Fix**: Railway deployment failed because it couldn't find `ffmpeg`. Adding a custom `nixpacks.toml` with `nixPkgs = ["...", "ffmpeg"]` and correcting the `providers = ["node"]` syntax resolved the build errors and ensured the bot container starts successfully with native `ffmpeg` installed.
+
+## Deployment fixes (2026-08-10)
+- **Runtime crash on Node 20 → bumped to Node 22.** After the build finally succeeded, the container **crashed on startup** with `TypeError: webidl.util.markAsUncloneable is not a function` (`undici@8.10.0/.../cachestorage.js`, required from `dist/services/forzadj-api.js`). Root cause: `undici@8` (added for the keep-alive fetch fix) calls `worker_threads.markAsUncloneable`, which **does not exist in Node 20** — added only in Node 22, while `nixpacks.toml` pinned `NIXPACKS_NODE_VERSION="20"`. Fix: bumped Node to **22** (`nixpacks.toml`, `.nvmrc`, `engines>=22`). Bot now starts and polls. Commit `e60d57b`.
+- **Single-instance rule (409).** A stale duplicate of this bot was also running on the site VPS under PM2 (`forzadj-bot`, `/opt/forzadj-admin-bot`), polling the same `BOT_TOKEN` → `409 Conflict`, both instances crash-looping. **Canonical home is Railway.** The VPS duplicate was removed (`pm2 delete forzadj-bot` + `pm2 save`). Do not run a second instance in parallel with production.
+- **AI provider is OpenRouter → gemini (correct).** `AI_PROVIDER=openrouter`, model google/gemini-2.5-flash via OpenRouter — confirmed working/billed. The earlier `403 "Access denied by security policy"` appeared only from the RU VPS IP (OpenRouter geo-restriction); not an issue from Railway (EU West).
+- **AI_GUIDE.md added** — read-first rules for AI assistants (Node 22, single instance, push-after-commit, OpenRouter→gemini, etc.).
