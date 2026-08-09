@@ -16,7 +16,7 @@
     "undici": "^8.10.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "devDependencies": {
     "@types/node": "^22.5.0",
