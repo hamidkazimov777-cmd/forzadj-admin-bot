@@ -2,6 +2,7 @@ import { Context } from "grammy";
 import { downloadTelegramFile } from "../services/telegram-download";
 import { extractAudioMetadata, cleanTitle } from "../services/audio-metadata";
 import { analyzeTrack } from "../services/ai/provider";
+import { fetchHistoricalProfile } from "../services/forzadj-api";
 import { pendingStore } from "../services/pending";
 import { getArtworkPath } from "../services/artwork";
 import { buildPreviewText, buildPreviewKeyboard } from "./preview";
@@ -69,6 +70,39 @@ export function createAudioHandler(token: string) {
     let aiResult: AIOutput | null = null;
     let artworkPath: string | null = null;
     try {
+      const history = await fetchHistoricalProfile(metadataInput.artist, metadataInput.remixer);
+      if (history) {
+        let profileStr = "";
+        
+        if (history.remixer) {
+          profileStr += `REMIXER: ${history.remixer.name}\n`;
+          for (const g of history.remixer.topGenres) {
+            const pct = Math.round((g.count / history.remixer.totalTracks) * 100);
+            profileStr += `- ${g.name}: ${pct}% (${g.count} tracks)\n`;
+          }
+          profileStr += "\n";
+        }
+        
+        if (history.artist) {
+          profileStr += `ORIGINAL ARTIST: ${history.artist.name}\n`;
+          for (const g of history.artist.topGenres) {
+            const pct = Math.round((g.count / history.artist.totalTracks) * 100);
+            profileStr += `- ${g.name}: ${pct}% (${g.count} tracks)\n`;
+          }
+          profileStr += "\n";
+        }
+
+        if (profileStr) {
+          let instruction = "";
+          if (history.remixer) {
+            instruction = `CRITICAL INSTRUCTION: Since this is a remix by ${history.remixer.name}, ${history.remixer.name}'s historical profile dictates the genre. Ignore the original artist's typical style and base your decision primarily on the remixer's history.`;
+          } else {
+            instruction = `CRITICAL INSTRUCTION: Use this historical data as a very strong signal. If the BPM and title do not contradict this, default to the artist's most frequent genre.`;
+          }
+          metadataInput.historicalProfile = `Historical Profile (from catalog):\n\n${profileStr}${instruction}`;
+        }
+      }
+
       aiResult = await analyzeTrack(metadataInput);
       artworkPath = await getArtworkPath(aiResult.genre);
     } catch (err) {

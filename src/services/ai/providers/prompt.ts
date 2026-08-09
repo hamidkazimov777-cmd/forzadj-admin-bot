@@ -33,6 +33,10 @@ export function buildPrompt(input: AIInput): string {
   if (tTitle.includes("festival")) hints += `Title Hint: 'Festival' usually implies EDM or Big Room.\n`;
   if (tTitle.includes("ukg") || tTitle.includes("garage")) hints += `Title Hint: 'UKG' or 'Garage' strictly means Garage.\n`;
   
+  if (input.historicalProfile) {
+    hints += `\n${input.historicalProfile}\n`;
+  }
+  
   if (hints) hints = `System Hints:\n${hints}\n`;
 
   return (

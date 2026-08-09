@@ -161,6 +161,7 @@ Everything is working end-to-end:
 - **Batch upload**: send multiple tracks — each is analyzed and queued. Publish/skip one at a time, cancel the whole queue if needed.
 - **Metadata normalization**: underscores → spaces, DJ service tags (Intro/Outro/Muzvizor/Dirty/Clean) stripped in both bot and site. Clean download filename stored in DB from the start.
 - **AI classification improvements**: BPM from ID3 tags sent to Gemini. Rewritten prompt for better genre/mood/version/rating. Rating = club potential (not production quality). Heuristics added to prompt: strict BPM boundaries, title dictionary (Amapiano, Festival, UKG), and Remixer extraction for genre override.
+- **Historical Memory (Local RAG)**: Before calling Gemini, the bot fetches the artist's and remixer's historical profile from the site's catalog (`/api/bot/history`). If found, this real-world catalog statistics data is injected directly into the Gemini prompt as a "CRITICAL INSTRUCTION", forcing the LLM to align its genre decisions with the platform's historical truth (giving absolute priority to the Remixer's profile if present).
 - **Prisma releaseDate fix**: `releaseDate` lives on `TrackVersion`, not `Track` — removed erroneous `releaseDate` from `trackRepository.update()` call that caused "Unknown argument" error on every publish.
 
 ## Full audit fixes (2026-08-05)

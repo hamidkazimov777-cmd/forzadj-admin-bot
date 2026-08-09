@@ -81,3 +81,40 @@ export async function publishTrack(pub: PendingPublication): Promise<PublishResu
 
   return { trackId: body.trackId, slug: body.slug, studioUrl: body.studioUrl };
 }
+
+export interface HistoricalStats {
+  name: string;
+  totalTracks: number;
+  topGenres: { name: string; count: number }[];
+}
+
+export interface HistoricalProfileResponse {
+  artist: HistoricalStats | null;
+  remixer: HistoricalStats | null;
+}
+
+export async function fetchHistoricalProfile(artist?: string, remixer?: string): Promise<HistoricalProfileResponse | null> {
+  const apiUrl = process.env.FORZADJ_API_URL;
+  const secret = process.env.FORZADJ_BOT_SECRET;
+
+  if (!apiUrl || !secret || (!artist && !remixer)) return null;
+
+  try {
+    const params = new URLSearchParams();
+    if (artist) params.append("artist", artist);
+    if (remixer) params.append("remixer", remixer);
+
+    const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/bot/history?${params.toString()}`, {
+      method: "GET",
+      headers: { "x-bot-secret": secret },
+      dispatcher: freshConnectionAgent,
+    });
+
+    if (!res.ok) return null;
+
+    return (await res.json()) as HistoricalProfileResponse;
+  } catch (err) {
+    console.error("[bot/history] Failed to fetch historical profile:", err);
+    return null;
+  }
+}
