@@ -138,6 +138,7 @@ Key facts:
 | `ce0f23d` | Force fresh connections for site publish requests to fix intermittent JSON parse crash |
 | `38b6ab0` | Fix premature pendingStore clear, add global error handler, plug temp-file leaks |
 | `dce8970` | Clean DJ service tags from titles, strip extra metadata on upload |
+| (pending) | feat: improve AI classification with remixer extraction, BPM heuristics, and DJ terminology |
 
 Site repo (`forzadjbeta`) recent relevant commits:
 | Commit | Message |
@@ -159,7 +160,7 @@ Everything is working end-to-end:
 - A single unhandled error in any handler no longer crashes the whole bot process (`bot.catch` in `index.ts`)
 - **Batch upload**: send multiple tracks — each is analyzed and queued. Publish/skip one at a time, cancel the whole queue if needed.
 - **Metadata normalization**: underscores → spaces, DJ service tags (Intro/Outro/Muzvizor/Dirty/Clean) stripped in both bot and site. Clean download filename stored in DB from the start.
-- **AI classification improvements**: BPM from ID3 tags sent to Gemini. Rewritten prompt for better genre/mood/version/rating. Rating = club potential (not production quality).
+- **AI classification improvements**: BPM from ID3 tags sent to Gemini. Rewritten prompt for better genre/mood/version/rating. Rating = club potential (not production quality). Heuristics added to prompt: strict BPM boundaries, title dictionary (Amapiano, Festival, UKG), and Remixer extraction for genre override.
 - **Prisma releaseDate fix**: `releaseDate` lives on `TrackVersion`, not `Track` — removed erroneous `releaseDate` from `trackRepository.update()` call that caused "Unknown argument" error on every publish.
 
 ## Full audit fixes (2026-08-05)

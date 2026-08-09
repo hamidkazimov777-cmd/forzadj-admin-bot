@@ -11,6 +11,7 @@ export interface AIInput {
   format?: string;
   embeddedGenre?: string;
   bpm?: number;
+  remixer?: string;
 }
 
 export interface AIOutput {

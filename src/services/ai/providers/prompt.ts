@@ -4,6 +4,7 @@ export function buildPrompt(input: AIInput): string {
   const lines: string[] = [];
   if (input.artist) lines.push(`Artist: ${input.artist}`);
   if (input.title) lines.push(`Title: ${input.title}`);
+  if (input.remixer) lines.push(`Remixer: ${input.remixer}`);
   if (input.album) lines.push(`Album: ${input.album}`);
   if (input.year !== undefined) lines.push(`Year: ${input.year}`);
   if (input.bpm !== undefined) lines.push(`BPM (from file): ${input.bpm}`);
@@ -13,9 +14,30 @@ export function buildPrompt(input: AIInput): string {
   if (input.embeddedGenre) lines.push(`Embedded genre tag: ${input.embeddedGenre}`);
 
   const trackInfo = lines.length > 0 ? `Track info:\n${lines.join("\n")}\n\n` : "";
+  
+  let hints = "";
+  if (input.remixer) {
+    hints += `CRITICAL: This is a remix by ${input.remixer}. Ignore the original artist's typical style. Base your genre classification strictly on what ${input.remixer} usually produces.\n`;
+  }
+  if (input.bpm) {
+    if (input.bpm >= 118 && input.bpm <= 124) {
+      hints += `BPM Hint: 118-124 BPM strongly suggests Afro House, Deep House, or House. It is rarely Bass House.\n`;
+    } else if (input.bpm >= 125 && input.bpm <= 129) {
+      hints += `BPM Hint: 125-129 BPM is typical for Tech House, Bass House, and EDM.\n`;
+    } else if (input.bpm >= 130) {
+      hints += `BPM Hint: >=130 BPM is ALMOST NEVER Tech House or Afro House. Strongly consider Garage, Breaks, Bass House, or Jersey Club.\n`;
+    }
+  }
+  const tTitle = input.title?.toLowerCase() || "";
+  if (tTitle.includes("amapiano")) hints += `Title Hint: 'Amapiano' strongly implies Afro House.\n`;
+  if (tTitle.includes("festival")) hints += `Title Hint: 'Festival' usually implies EDM or Big Room.\n`;
+  if (tTitle.includes("ukg") || tTitle.includes("garage")) hints += `Title Hint: 'UKG' or 'Garage' strictly means Garage.\n`;
+  
+  if (hints) hints = `System Hints:\n${hints}\n`;
 
   return (
     `${trackInfo}` +
+    `${hints}` +
     `You are an expert DJ and music curator for ForzaDJ, a professional DJ pool. ` +
     `Use your deep knowledge of electronic music, artists, labels, club culture, and the global DJ industry to classify this track. ` +
     `If the artist is known, reason from their actual style, label, and typical releases — do not default to generic answers.\n\n` +
@@ -29,19 +51,19 @@ export function buildPrompt(input: AIInput): string {
     `- Anything else (original mix, radio edit, no suffix) → "Original"\n\n` +
 
     `GENRE (choose exactly one — be specific, use artist/label knowledge):\n` +
-    `Afro House — African percussion, tribal elements, deep groove, labels: Afro Nation, Traxsource Afro\n` +
+    `Afro House — African percussion, tribal elements, deep groove, 118-123 BPM, artists: Keinemusik, Black Coffee. labels: Afro Nation\n` +
     `Baile Funk — Brazilian funk, MC vocals, aggressive bass, 150–170 BPM\n` +
-    `Bass House — heavy distorted bass, aggressive drops, UK/US club, labels: Night Bass, Dirtybird\n` +
+    `Bass House — heavy distorted bass, aggressive drops, 124-130 BPM, artists: Knock2, Habstrakt. labels: Night Bass\n` +
     `Breaks — breakbeat rhythm, syncopated drums, 120–140 BPM\n` +
-    `EDM — big-room festival anthems, mainstream drops, labels: Spinnin, Revealed, Armada\n` +
-    `Garage — UK garage, 2-step, soulful vocals, ~130 BPM, labels: Black Butter, Defected\n` +
+    `EDM — big-room festival anthems, mainstream drops, 126-130 BPM. labels: Spinnin, Revealed\n` +
+    `Garage — UK garage, 2-step, soulful vocals, ~130-140+ BPM, swung beat, artists: Disclosure, Sammy Virji. labels: Black Butter\n` +
     `Hip-Hop — rap vocals, boom-bap or trap, hip-hop culture, 70–100 BPM\n` +
-    `House — classic/soulful/deep house, 4/4 kick, 120–128 BPM, labels: Defected, Toolroom, Relief\n` +
+    `House — classic/soulful/deep house, 4/4 kick, 120–128 BPM, labels: Defected, Toolroom\n` +
     `Jersey Club — Jersey/Chicago footwork, fast hi-hats, 130–160 BPM, labels: Club Glow\n` +
     `Open Format — truly mixed/unclassifiable, use only as last resort\n` +
     `Pop — mainstream pop, vocals-led, radio-friendly, crossover\n` +
     `Rus — Russian-language pop/rap/chanson/electronic\n` +
-    `Tech House — techno+house hybrid, punchy kicks, minimal groove, 126–135 BPM, labels: Drumcode, Repopulate Mars, Relief\n\n` +
+    `Tech House — techno+house hybrid, punchy kicks, minimal groove, 124–128 BPM, artists: Fisher, James Hype, Chris Lake. labels: Drumcode, Repopulate Mars\n\n` +
 
     `MOOD — think about WHERE and WHEN a DJ would play this track in a set:\n` +
     `Warm Up — opening set, background atmosphere, crowd is arriving, low intensity. ` +

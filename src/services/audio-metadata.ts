@@ -20,6 +20,13 @@ export function cleanTitle(title: string): string {
   return cleaned || title;
 }
 
+const REMIXER_TAG = /[\(\[]([^)\]]+?)\s+(?:Remix|Edit|Bootleg|Flip|VIP|Mashup|Rework)[\)\]]/i;
+
+export function extractRemixer(title: string): string | undefined {
+  const match = title.match(REMIXER_TAG);
+  return match ? match[1].trim() : undefined;
+}
+
 function parseArtistTitle(fileName: string): { artist?: string; title?: string } {
   // Normalize underscores to spaces (common in Beatport/Traxsource filenames) and
   // collapse any runs of whitespace, then strip the extension.
@@ -119,6 +126,11 @@ export async function extractAudioMetadata(
 
     const input: AIInput = {};
     if (artist) input.artist = artist;
+    
+    // Extract remixer from raw title before cleaning service tags
+    const remixer = title ? extractRemixer(title) : undefined;
+    if (remixer) input.remixer = remixer;
+
     if (title) input.title = cleanTitle(title);
     if (common.album) input.album = common.album;
     if (common.year !== undefined) input.year = common.year;
