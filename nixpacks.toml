@@ -1,5 +1,7 @@
-[providers.node]
-nodeVersion = "20"
+providers = ["node"]
+
+[variables]
+NIXPACKS_NODE_VERSION = "20"
 
 [phases.setup]
-aptPkgs = ["...", "ffmpeg"]
+aptPkgs = ["ffmpeg"]
