@@ -3,6 +3,7 @@ import { downloadTelegramFile } from "../services/telegram-download";
 import { extractAudioMetadata, cleanTitle } from "../services/audio-metadata";
 import { analyzeTrack } from "../services/ai/provider";
 import { fetchHistoricalProfile } from "../services/forzadj-api";
+import { convertToMp3IfNeeded } from "../services/ffmpeg";
 import { pendingStore } from "../services/pending";
 import { getArtworkPath } from "../services/artwork";
 import { buildPreviewText, buildPreviewKeyboard } from "./preview";
@@ -56,6 +57,19 @@ export function createAudioHandler(token: string) {
     if (!downloaded) {
       await ctx.reply("⚠️ Failed to download the file from Telegram.");
       return;
+    }
+
+    try {
+      const newPath = await convertToMp3IfNeeded(downloaded.savePath);
+      if (newPath !== downloaded.savePath) {
+        downloaded.savePath = newPath;
+        downloaded.saveName = newPath.split('/').pop() || downloaded.saveName;
+        file.mime_type = "audio/mpeg";
+      }
+    } catch (err) {
+      console.error("[ffmpeg] conversion error:", err);
+      // We log but continue, falling back to original file if conversion broke unexpectedly 
+      // (though it throws after deleting output, the original file is still there).
     }
 
     const { input: metadataInput } = await extractAudioMetadata(downloaded.savePath, file.file_name);
