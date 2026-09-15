@@ -1,15 +1,12 @@
 import type { AIInput, AIOutput } from "../types";
 import { buildPrompt } from "./prompt";
-
 export async function analyzeWithCloudflare(input: AIInput): Promise<AIOutput> {
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (!apiToken) throw new Error("CLOUDFLARE_API_TOKEN is not set.");
   if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID is not set.");
-
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
-
   let res: Response;
   try {
     res = await fetch(
@@ -40,22 +37,35 @@ export async function analyzeWithCloudflare(input: AIInput): Promise<AIOutput> {
   } finally {
     clearTimeout(timeout);
   }
-
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Cloudflare AI request failed: HTTP ${res.status} — ${body}`);
   }
-
   const data = (await res.json()) as {
-    result?: { response?: string };
+    result?: {
+      response?: unknown;
+      choices?: { message?: { content?: string } }[];
+    };
   };
-  const content = data.result?.response;
-  if (!content) throw new Error("Cloudflare AI returned an empty response.");
-
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Cloudflare AI response did not contain valid JSON.");
-
-  const parsed = JSON.parse(jsonMatch[0]) as AIOutput;
+  // Cloudflare Workers AI менял форму ответа: раньше result.response был
+  // строкой, теперь может быть уже разобранным объектом либо лежать в
+  // choices[].message.content (OpenAI-совместимый формат).
+  const raw = data.result?.response;
+  let parsed: AIOutput;
+  if (raw && typeof raw === "object") {
+    parsed = raw as AIOutput;
+  } else {
+    const content =
+      (typeof raw === "string" ? raw : undefined) ??
+      data.result?.choices?.[0]?.message?.content;
+    if (typeof content !== "string" || !content) {
+      throw new Error("Cloudflare AI returned an empty response.");
+    }
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch)
+      throw new Error("Cloudflare AI response did not contain valid JSON.");
+    parsed = JSON.parse(jsonMatch[0]) as AIOutput;
+  }
   return {
     genre: String(parsed.genre),
     mood: String(parsed.mood),
