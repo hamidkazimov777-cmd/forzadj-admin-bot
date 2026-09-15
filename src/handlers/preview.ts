@@ -1,6 +1,23 @@
 import { InlineKeyboard } from "grammy";
 import type { PendingPublication } from "../services/pending";
 
+/** Канонический список жанров ForzaDJ (для кнопок и валидации). */
+export const GENRES = [
+  "Afro House",
+  "Baile Funk",
+  "Bass House",
+  "Breaks",
+  "EDM",
+  "Garage",
+  "Hip-Hop",
+  "House",
+  "Jersey Club",
+  "Open Format",
+  "Pop",
+  "Rus",
+  "Tech House",
+] as const;
+
 function ratingStars(n: number): string {
   const filled = Math.min(5, Math.max(1, Math.round(n)));
   return "★".repeat(filled) + "☆".repeat(5 - filled);
@@ -67,6 +84,15 @@ export function buildRatingKeyboard(): InlineKeyboard {
     kb.text(`${"★".repeat(n)} ${n}`, `set_rating_${n}`).row();
   }
   return kb.text("« Back", "edit_back");
+}
+
+export function buildGenreKeyboard(): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  GENRES.forEach((genre, i) => {
+    kb.text(genre, `set_genre_${genre}`);
+    if (i % 2 === 1) kb.row();
+  });
+  return kb.row().text("« Back", "edit_back");
 }
 
 export function buildMoodKeyboard(): InlineKeyboard {

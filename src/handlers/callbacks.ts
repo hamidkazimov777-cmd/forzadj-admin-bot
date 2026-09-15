@@ -7,9 +7,11 @@ import {
   buildPreviewText,
   buildPreviewKeyboard,
   buildEditKeyboard,
+  buildGenreKeyboard,
   buildMoodKeyboard,
   buildVersionKeyboard,
   buildRatingKeyboard,
+  GENRES,
 } from "./preview";
 
 async function showNext(ctx: Context, chatId: number): Promise<void> {
@@ -95,14 +97,20 @@ async function onEditGenre(ctx: Context): Promise<void> {
   if (!pending) { await ctx.reply("⚠️ Нет активного трека."); return; }
   pending.waitingFor = "genre";
   const current = pending.aiResult?.genre ?? "—";
-  await ctx.reply(
-    `Текущий жанр: ${current}\n\n` +
-    `Доступные жанры:\n` +
-    `Afro House · Baile Funk · Bass House · Breaks · EDM\n` +
-    `Garage · Hip-Hop · House · Jersey Club · Open Format\n` +
-    `Pop · Rus · Tech House\n\n` +
-    `Отправь новый жанр (точно как написано выше):`
-  );
+  await ctx.reply(`Текущий жанр: ${current}\n\nВыбери:`, { reply_markup: buildGenreKeyboard() });
+}
+
+async function onSetGenre(ctx: Context, genre: string): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const chatId = ctx.chat?.id;
+  if (chatId === undefined) return;
+  const pending = pendingStore.peek(chatId);
+  if (!pending || !pending.aiResult) { await ctx.reply("⚠️ Нет активного трека."); return; }
+  pending.aiResult.genre = genre;
+  pending.waitingFor = undefined;
+  pending.artworkPath = await getArtworkPath(genre);
+  const size = pendingStore.size(chatId);
+  await ctx.reply(buildPreviewText(pending, 1, size), { reply_markup: buildPreviewKeyboard(size) });
 }
 
 async function onEditMood(ctx: Context): Promise<void> {
@@ -220,6 +228,9 @@ export function registerCallbackHandlers(bot: Bot): void {
   bot.callbackQuery("cancel", onCancel);
   bot.callbackQuery("cancel_all", onCancelAll);
 
+  for (const genre of GENRES) {
+    bot.callbackQuery(`set_genre_${genre}`, (ctx) => onSetGenre(ctx, genre));
+  }
   for (const mood of ["Warm Up", "Prime Time", "After Party"]) {
     bot.callbackQuery(`set_mood_${mood}`, (ctx) => onSetMood(ctx, mood));
   }
